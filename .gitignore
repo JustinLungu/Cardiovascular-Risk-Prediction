@@ -1,0 +1,16 @@
+# Project data
+data/
+x_train.csv
+y_train.csv
+x_test.csv
+
+# Generated predictions
+*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / IDE
+.vscode/
+.idea/
+.DS_Store
