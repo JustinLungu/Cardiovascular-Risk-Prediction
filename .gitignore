@@ -1,6 +1,11 @@
 *.csv
 *.pdf
 
+# Local dataset files (keep the data README tracked)
+data/*
+!data/Readme.md
+!data/README.md
+
 .venv/
 __pycache__/
 .pytest_cache/
