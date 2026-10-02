@@ -53,3 +53,11 @@ or activate the environment directly:
 source .venv/bin/activate   # macOS / Linux
 .venv\Scripts\activate      # Windows
 ```
+
+## Download the dataset
+
+To download and prepare the dataset, run:
+
+```bash
+bash scripts/prepare_data.sh
+```
