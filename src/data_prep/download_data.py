@@ -12,10 +12,10 @@ from urllib.error import URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import HTTPCookieProcessor, build_opener
 
-from extract_data import dataset_is_ready
+from .extract_data import dataset_is_ready
 
 FILE_ID = "1OPPHkYV74cr678qnmaAoX217nCrt678K"
-ARCHIVE = Path(__file__).resolve().parents[1] / "data" / "dataset_to_release.zip"
+ARCHIVE = Path(__file__).resolve().parents[2] / "data" / "dataset_to_release.zip"
 DOWNLOAD_URL = "https://drive.google.com/uc?" + urlencode(
     {"export": "download", "id": FILE_ID}
 )
