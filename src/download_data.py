@@ -12,6 +12,8 @@ from urllib.error import URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import HTTPCookieProcessor, build_opener
 
+from extract_data import dataset_is_ready
+
 FILE_ID = "1OPPHkYV74cr678qnmaAoX217nCrt678K"
 ARCHIVE = Path(__file__).resolve().parents[1] / "data" / "dataset_to_release.zip"
 DOWNLOAD_URL = "https://drive.google.com/uc?" + urlencode(
@@ -55,6 +57,9 @@ def validate_archive(path):
 def download_archive(destination=ARCHIVE):
     """Reuse a valid ZIP or download and validate it before atomic replacement."""
     destination = Path(destination)
+    if not destination.exists() and dataset_is_ready(destination.parent):
+        print("Extracted dataset is verified; no ZIP download needed.", flush=True)
+        return
     if destination.exists():
         try:
             validate_archive(destination)

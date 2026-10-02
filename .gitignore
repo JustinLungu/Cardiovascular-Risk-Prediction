@@ -1,10 +1,10 @@
 *.csv
 *.pdf
 
-# Dataset downloads (keep the data README tracked)
-data/*.zip
-data/*.part
-data/.extract-*/
+# Local dataset files (keep the data README tracked)
+data/*
+!data/Readme.md
+!data/README.md
 
 .venv/
 __pycache__/
