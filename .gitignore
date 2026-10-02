@@ -4,6 +4,7 @@
 # Dataset downloads (keep the data README tracked)
 data/*.zip
 data/*.part
+data/.extract-*/
 
 .venv/
 __pycache__/

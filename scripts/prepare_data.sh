@@ -11,3 +11,4 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 uv run --locked --no-dev python src/download_data.py
+uv run --locked --no-dev python src/extract_data.py
