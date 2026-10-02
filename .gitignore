@@ -1,16 +1,11 @@
-# Project data
-data/
-x_train.csv
-y_train.csv
-x_test.csv
-
-# Generated predictions
 *.csv
+*.pdf
 
-# Jupyter
-.ipynb_checkpoints/
+.venv/
+__pycache__/
+.pytest_cache/
 
-# OS / IDE
 .vscode/
 .idea/
 .DS_Store
+

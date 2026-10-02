@@ -39,7 +39,7 @@ From the repo root:
 uv sync
 ```
 
-This creates a `.venv/` with the exact Python version and dependencies pinned in `pyproject.toml` / `uv.lock` (only `numpy` and `matplotlib`, per the project's allowed-libraries rule).
+This creates a `.venv/` using Python 3.9, NumPy 1.23.1, and Matplotlib 3.5.2, matching the course grading environment. `uv.lock` pins the resolved dependencies. Development tools (pytest 7.1.2, GitPython 3.1.18, and Black 22.6.0) are included by default for the supplied tests; they are not libraries for the ML implementation. Use `uv sync --no-dev` for just the project dependencies.
 
 ### 3. Run code
 
