@@ -24,7 +24,7 @@ def load_csv_data(data_path, sub_sample=False):
     y_train = np.genfromtxt(
         os.path.join(data_path, "y_train.csv"),
         delimiter=",",
-        skip_header=1,
+        skip_header=1,  
         dtype=int,
         usecols=1,
     )

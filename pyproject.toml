@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.9,<3.10"
 dependencies = [
+    "ipykernel>=6.31.0",
     "matplotlib==3.5.2",
+    "matplotlib-inline<0.2",
     "numpy==1.23.1",
 ]
 
