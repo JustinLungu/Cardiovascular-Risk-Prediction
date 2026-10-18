@@ -1,4 +1,4 @@
-# Cardiovascular-Risk-Predictionnn
+# Cardiovascular-Risk-Prediction
 From-scratch cardiovascular risk prediction on 300k+ BRFSS records using NumPy, with custom ML algorithms, preprocessing, and cross-validation.
 
 ## Setup
@@ -65,3 +65,5 @@ bash scripts/prepare_data.sh
 ## Code structure
 
 `implementations.py` and `run.py` stay at the repository root because the course grading tests expect them there. The former contains the six required ML methods; the latter is a thin entry point for reproducing predictions. Other reusable code lives in `src/`, with data preparation in `src/data_prep/` and exploration in `src/data_exploration/`.
+
+Exploratory notebooks live in `notebooks/`, starting with [exploration.ipynb](notebooks/exploration.ipynb). When opening a notebook in your editor, select the Python kernel from the project's `.venv` environment.
