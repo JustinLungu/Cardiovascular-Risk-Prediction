@@ -60,8 +60,8 @@ class LinearMSE(LinMod):
         err = y - self.predict(x)
         return -(x.T @ err) / len(y)
 
-    def closed_sol(self, y, x, lmbd=0.0):
-        A = x.T @ x + lmbd * np.eye(x.shape[1])
+    def closed_sol(self, y, x):
+        A = x.T @ x
         b = x.T @ y
         self.w = np.linalg.solve(A, b)
         return self.w, self.loss(y, x)
@@ -78,6 +78,14 @@ class RidgeMSE(LinearMSE):
         err = y - self.predict(x)
         return super().gradient(y, x) + 2 * self.lmbd * self.w  # Call mother gradient
 
+    # need to overload closed solution to apply penalty with factor 2n
+    def closed_sol(self, y, x):
+        n = len(y)
+        A = x.T @ x + 2 * n * self.lmbd * np.eye(x.shape[1])
+        b = x.T @ y
+        self.w = np.linalg.solve(A, b)
+        return self.w, self.loss(y, x)
+
 
 class Logistic(LinMod):
 
@@ -86,11 +94,11 @@ class Logistic(LinMod):
         return 1.0 / (1.0 + np.exp(-(x @ self.w)))
 
     def loss(self, y, x):
-        z = self.predict(x)
+        z = x @ self.w
         return np.mean(np.logaddexp(0, z) - y * z)
 
     def gradient(self, y, x):
-        z = self.predict(x)
+        z = x @ self.w
         p = 1.0 / (1.0 + np.exp(-z))
         return x.T @ (p - y) / len(y)
 
@@ -143,7 +151,7 @@ def ridge_regression(y, x, lmbd):
     Note: the returned loss does NOT include the penalty term.
     """
     model = RidgeMSE(x.shape[1], lmbd)
-    return model.closed_sol(y, x, lmbd)
+    return model.closed_sol(y, x)
 
 
 def logistic_regression(y, x, w0, max_it, gamma):
