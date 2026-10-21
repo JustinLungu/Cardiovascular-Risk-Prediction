@@ -47,6 +47,21 @@ class LinMod(ABC):
             self.w -= gamma * self.gradient(y[j : j + 1], x[j : j + 1])
         return self.w, self.loss(y, x)
 
+class SVM(LinMod):
+    """Soft support vector machine model"""
+    def __init__(self, d, lmbd):
+        super().__init__(d)  # call d initialization of mother class
+        self.lmbd = lmbd  # init new attribute lambda
+
+    def loss(self, y, x):
+        err = 1 - y*self.predict(x)
+        return np.mean(np.maximum(0, err))
+
+    def gradient(self, y, x):
+        err = 1 - y*self.predict(x)
+        mask = (err < 1).astype(float)      # on the margin is not an error 
+        return self.lmbd * self.w -(x.T @ (y * mask)) / len(y)
+
 
 class LinearMSE(LinMod):
     """Linear regression with loss = 0.5MSE"""
@@ -75,7 +90,6 @@ class RidgeMSE(LinearMSE):
         self.lmbd = lmbd  # init new attribute lambda
 
     def gradient(self, y, x):
-        err = y - self.predict(x)
         return super().gradient(y, x) + 2 * self.lmbd * self.w  # Call mother gradient
 
     # need to overload closed solution to apply penalty with factor 2n
@@ -85,6 +99,7 @@ class RidgeMSE(LinearMSE):
         b = x.T @ y
         self.w = np.linalg.solve(A, b)
         return self.w, self.loss(y, x)
+
 
 
 class Logistic(LinMod):
@@ -168,4 +183,12 @@ def reg_logistic_regression(y, x, lmbd, w0, max_it, gamma):
     returns (w, logistic_loss) where the loss does NOT include the penalty.
     """
     model = RegLog(x.shape[1], lmbd)
+    return model.gd(y, x, w0, max_it, gamma)
+
+def svm(y, x, lmbd, w0, max_it, gamma):
+    """Soft-margin SVM via gradient descent (y in {-1, +1}).
+    Minimizes hinge loss + λ/2 * ||w||² and returns (w, hinge_loss).
+    The returned loss does NOT include the penalty term.
+    """
+    model = SVM(x.shape[1], lmbd)
     return model.gd(y, x, w0, max_it, gamma)
