@@ -59,7 +59,7 @@ class SVM(LinMod):
 
     def gradient(self, y, x):
         err = 1 - y*self.predict(x)
-        mask = (err < 1).astype(float)      # on the margin is not an error 
+        mask = (err > 0).astype(float)       # on the margin is not an error 
         return self.lmbd * self.w -(x.T @ (y * mask)) / len(y)
 
 
