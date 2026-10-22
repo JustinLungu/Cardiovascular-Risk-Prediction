@@ -84,6 +84,18 @@ Reuse the existing stratified 60/20/20 partitions from `src/train_test_split.py`
 
 `data/train_test_split/x_test.csv` and its paired labels form the local test set. `data/x_test.csv` is the competition benchmark with hidden labels.
 
+For an already-loaded split dictionary returned by `TrainTestSplit`, prepare the two datasets with:
+
+```python
+from src.training import prepare_development_and_holdout
+
+development, holdout = prepare_development_and_holdout(parts)
+X_dev, y_dev = development["X"], development["y"]
+X_test, y_test = holdout["X"], holdout["y"]
+```
+
+The helper joins train and validation in that order, retaining features, raw labels, missing values, and IDs. It returns the existing test partition unchanged and checks that row IDs are unique across all three input partitions.
+
 ### Cross-validation and preprocessing
 
 Use five-fold stratified cross-validation within development data. Generate the fold indices once with seed `42` and reuse identical folds for every candidate. In each round, four folds train the model and one fold validates it: approximately 64% and 16% of all labeled rows, respectively. Every development row appears in validation exactly once; the local test set stays reserved throughout model selection.

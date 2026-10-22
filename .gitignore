@@ -11,6 +11,9 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 
+# Local verification tests
+/tests/
+
 .vscode/
 .idea/
 .DS_Store
