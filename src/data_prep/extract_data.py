@@ -9,7 +9,7 @@ import zipfile
 import zlib
 from pathlib import Path, PurePosixPath
 
-DATA_DIRECTORY = Path(__file__).resolve().parents[1] / "data"
+DATA_DIRECTORY = Path(__file__).resolve().parents[2] / "data"
 ARCHIVE = DATA_DIRECTORY / "dataset_to_release.zip"
 MANIFEST = ".extracted.json"
 REQUIRED_FILES = ("x_train.csv", "y_train.csv", "x_test.csv")
