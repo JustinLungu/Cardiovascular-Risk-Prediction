@@ -100,6 +100,19 @@ The helper joins train and validation in that order, retaining features, raw lab
 
 Use five-fold stratified cross-validation within development data. Generate the fold indices once with seed `42` and reuse identical folds for every candidate. In each round, four folds train the model and one fold validates it: approximately 64% and 16% of all labeled rows, respectively. Every development row appears in validation exactly once; the local test set stays reserved throughout model selection.
 
+Generate the folds from development labels only:
+
+```python
+from src.cross_validation import stratified_k_fold
+
+folds = stratified_k_fold(development["y"], k=5, seed=42)
+for training_rows, validation_rows in folds:
+    X_train, y_train = development["X"][training_rows], development["y"][training_rows]
+    X_val, y_val = development["X"][validation_rows], development["y"][validation_rows]
+```
+
+The returned list contains row positions relative to development data and can be reused for all models. Each class needs at least `k` rows so every validation fold includes it. Class counts differ by at most one across validation folds; rounding can affect their total sizes.
+
 Within each fold, fit all learned preprocessing on its training rows, including imputation, scaling, categorical encoders, and any data-driven feature selection. Apply those fitted parameters and the same feature-column order to validation rows. Preprocessing integration must provide a way to fit on training rows and transform other rows without refitting.
 
 Control training randomness as well as fold generation, including the sampling used by SGD. Record the seeds with the experiment settings.
