@@ -26,3 +26,14 @@ def prepare_development_and_holdout(parts):
         raise ValueError("Row IDs must be unique across train, validation, and test.")
 
     return development, holdout
+
+
+def always_negative_baseline(X):
+    """Return (y_pred, y_score), predicting -1 for every feature row in X.
+
+    Only the row count is used; no fitting or preprocessing is needed.
+    Decision scores are fixed at -1.0, so all rows receive the same ranking.
+    """
+    y_pred = np.full(len(X), -1, dtype=int)
+    y_score = np.full(len(X), -1.0)
+    return y_pred, y_score

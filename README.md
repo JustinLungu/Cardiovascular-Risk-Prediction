@@ -146,6 +146,18 @@ Rank candidate configurations by mean positive-class F1 across the five validati
 
 Select hyperparameters and prediction thresholds using development cross-validation. For threshold selection, collect out-of-fold scores: each development row's score comes from a model trained on the other folds. Save model settings, thresholds, seeds, and per-fold results so experiments can be reproduced.
 
+### Always-negative baseline
+
+`always_negative_baseline(X)` in `src/training.py` returns `(y_pred, y_score)`, predicting `-1` for every feature row with constant decision scores of `-1.0`. It needs no fitting or preprocessing. With both classes present, precision, recall, and F1 are `0.0`, ROC-AUC is `0.5`, and accuracy equals the share of negative labels. This reference shows how much accuracy can come from class imbalance alone.
+
+```python
+from src.training import always_negative_baseline
+from src.metrics import evaluate
+
+y_pred, y_score = always_negative_baseline(X_val)
+baseline_metrics = evaluate(y_val, y_pred, y_score)
+```
+
 ### Final evaluation and submission
 
 After selecting and freezing a configuration, refit preprocessing and the model on all 80% development data. Apply that fitted pipeline and its selected threshold to the reserved 20% local test set for the final local evaluation.
