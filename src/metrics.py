@@ -66,3 +66,39 @@ def f1_score(y_true, y_pred):
     if denominator == 0:
         return 0.0
     return 2 * counts["tp"] / denominator
+
+
+def roc_auc_score(y_true, y_score):
+    """Return ROC-AUC for {-1, +1} labels and matching 1D prediction scores.
+
+    Higher scores must indicate +1; use probabilities or decision scores before
+    thresholding. Scores must be finite and both classes must be present.
+    Empty or single-class labels raise ValueError.
+    """
+    y_true, y_score = np.asarray(y_true), np.asarray(y_score)
+    # Each score must correspond to exactly one true label.
+    if y_true.ndim != 1 or y_score.ndim != 1 or y_true.shape != y_score.shape:
+        raise ValueError("True labels and scores must be matching 1D arrays.")
+    if not np.isin(y_true, (-1, 1)).all():
+        raise ValueError("True labels must contain only -1 and +1.")
+    # Missing or infinite scores cannot define a valid ROC curve.
+    if not np.isfinite(y_score).all():
+        raise ValueError("Prediction scores must be finite.")
+
+    n_positive = np.count_nonzero(y_true == 1)
+    n_negative = np.count_nonzero(y_true == -1)
+    if n_positive == 0 or n_negative == 0:
+        raise ValueError("ROC-AUC requires both -1 and +1 labels.")
+
+    # Lowering the threshold includes rows from highest to lowest score.
+    order = np.argsort(y_score)[::-1]
+    sorted_labels, sorted_scores = y_true[order], y_score[order]
+    # Include all rows with the same score together so ties are treated equally.
+    threshold_ends = np.append(sorted_scores[1:] != sorted_scores[:-1], True)
+    true_positives = np.cumsum(sorted_labels == 1)[threshold_ends]
+    false_positives = np.cumsum(sorted_labels == -1)[threshold_ends]
+
+    # Start the ROC curve at (0, 0), where no rows are predicted positive.
+    true_positive_rate = np.append(0.0, true_positives / n_positive)
+    false_positive_rate = np.append(0.0, false_positives / n_negative)
+    return float(np.trapz(true_positive_rate, false_positive_rate))
