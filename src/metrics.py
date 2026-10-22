@@ -102,3 +102,20 @@ def roc_auc_score(y_true, y_score):
     true_positive_rate = np.append(0.0, true_positives / n_positive)
     false_positive_rate = np.append(0.0, false_positives / n_negative)
     return float(np.trapz(true_positive_rate, false_positive_rate))
+
+
+def evaluate(y_true, y_pred, y_score):
+    """Return accuracy, precision, recall, F1, and ROC-AUC in one dictionary.
+
+    Supply matching 1D arrays: true/predicted labels in {-1, +1} and finite
+    scores where higher means +1. Choose the prediction threshold beforehand;
+    only ROC-AUC uses the continuous scores. Both true classes are required,
+    so empty or single-class labels raise ValueError, as in roc_auc_score.
+    """
+    return {
+        "accuracy": accuracy(y_true, y_pred),
+        "precision": precision(y_true, y_pred),
+        "recall": recall(y_true, y_pred),
+        "f1": f1_score(y_true, y_pred),
+        "roc_auc": roc_auc_score(y_true, y_score),
+    }

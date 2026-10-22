@@ -129,6 +129,19 @@ The positive class is `+1`. Evaluation labels and class predictions use `{-1, +1
 
 `roc_auc_score(y_true, y_score)` measures how well scores rank positives above negatives across prediction thresholds. Supply finite probabilities or decision scores, with higher scores indicating `+1`. Perfect ranking scores `1.0`, reversed ranking scores `0.0`, and equal scores for all rows give `0.5`. Ties are handled together. Labels must include both classes; empty or single-class inputs raise `ValueError` because ROC-AUC is undefined for them.
 
+`evaluate(y_true, y_pred, y_score)` returns all five metrics in one dictionary with keys `accuracy`, `precision`, `recall`, `f1`, and `roc_auc`. Supply class predictions made using the threshold chosen in the training workflow, plus continuous scores for ROC-AUC. It follows the same input rules and requires both true classes.
+
+```python
+from src.metrics import evaluate
+
+results = evaluate(
+    y_true=[-1, -1, 1, 1],
+    y_pred=[-1, -1, -1, 1],
+    y_score=[0.1, 0.4, 0.35, 0.8],
+)
+# accuracy=0.75, precision=1.0, recall=0.5, f1=2/3, roc_auc=0.75
+```
+
 Rank candidate configurations by mean positive-class F1 across the five validation folds. Report fold standard deviations, positive-class precision and recall, accuracy, ROC-AUC, and training time alongside F1. This is our local model selection policy; retain both F1 and accuracy for comparison with competition scores. Keep each model's training loss as a diagnostic, since different objectives such as MSE, logistic loss, and hinge loss are not directly comparable.
 
 Select hyperparameters and prediction thresholds using development cross-validation. For threshold selection, collect out-of-fold scores: each development row's score comes from a model trained on the other folds. Save model settings, thresholds, seeds, and per-fold results so experiments can be reproduced.
