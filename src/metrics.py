@@ -55,3 +55,14 @@ def recall(y_true, y_pred):
     if actual_positive == 0:
         return 0.0
     return counts["tp"] / actual_positive
+
+
+def f1_score(y_true, y_pred):
+    """Return positive-class F1, the harmonic mean of precision and recall."""
+    counts = confusion_counts(y_true, y_pred)
+    # Equivalent to 2 * precision * recall / (precision + recall).
+    denominator = 2 * counts["tp"] + counts["fp"] + counts["fn"]
+    # With no actual or predicted positives, use 0.0 instead of dividing by zero.
+    if denominator == 0:
+        return 0.0
+    return 2 * counts["tp"] / denominator

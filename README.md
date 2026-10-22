@@ -125,6 +125,8 @@ The positive class is `+1`. Evaluation labels and class predictions use `{-1, +1
 
 `accuracy(y_true, y_pred)`, `precision(y_true, y_pred)`, and `recall(y_true, y_pred)` use the same label inputs. Accuracy is `(tp + tn) / total`, precision is `tp / (tp + fp)`, and recall is `tp / (tp + fn)`. Each returns a fraction between 0 and 1; a zero denominator returns `0.0`, including for empty inputs.
 
+`f1_score(y_true, y_pred)` combines positive-class precision and recall using their harmonic mean: `2 * tp / (2 * tp + fp + fn)`. It uses the same label inputs and returns `0.0` for a zero denominator. An all-negative predictor therefore receives F1 `0.0`, even when class imbalance gives it high accuracy.
+
 Rank candidate configurations by mean positive-class F1 across the five validation folds. Report fold standard deviations, positive-class precision and recall, accuracy, ROC-AUC, and training time alongside F1. This is our local model selection policy; retain both F1 and accuracy for comparison with competition scores. Keep each model's training loss as a diagnostic, since different objectives such as MSE, logistic loss, and hinge loss are not directly comparable.
 
 Select hyperparameters and prediction thresholds using development cross-validation. For threshold selection, collect out-of-fold scores: each development row's score comes from a model trained on the other folds. Save model settings, thresholds, seeds, and per-fold results so experiments can be reproduced.
