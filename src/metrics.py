@@ -26,3 +26,32 @@ def confusion_counts(y_true, y_pred):
         "fp": int(np.count_nonzero((y_true == -1) & (y_pred == 1))),
         "fn": int(np.count_nonzero((y_true == 1) & (y_pred == -1))),
     }
+
+
+def accuracy(y_true, y_pred):
+    """Return the fraction of correct predictions, or 0.0 for empty inputs."""
+    counts = confusion_counts(y_true, y_pred)
+    total = sum(counts.values())
+    if total == 0:
+        return 0.0
+    return (counts["tp"] + counts["tn"]) / total
+
+
+def precision(y_true, y_pred):
+    """Return the fraction of predicted positives that are correct (+1 class)."""
+    counts = confusion_counts(y_true, y_pred)
+    predicted_positive = counts["tp"] + counts["fp"]
+    # Without positive predictions, use 0.0 instead of dividing by zero.
+    if predicted_positive == 0:
+        return 0.0
+    return counts["tp"] / predicted_positive
+
+
+def recall(y_true, y_pred):
+    """Return the fraction of actual positives that were detected (+1 class)."""
+    counts = confusion_counts(y_true, y_pred)
+    actual_positive = counts["tp"] + counts["fn"]
+    # Without actual positives, use 0.0 instead of dividing by zero.
+    if actual_positive == 0:
+        return 0.0
+    return counts["tp"] / actual_positive
