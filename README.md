@@ -78,6 +78,7 @@ bash scripts/prepare_data.sh
 | `src/model_comparison.py` | `ModelComparison`: evaluate named candidates on shared folds and format their ranked results. |
 | `src/reporting.py` | Save comparison settings, exact folds, metrics, and fitting times as JSON. |
 | `src/visualization.py` | Plot mean validation F1 with fold standard deviation error bars. |
+| `src/threshold_tuning.py` | Select thresholds from development OOF scores while retaining the original results. |
 
 Exploratory notebooks live in `notebooks/`, starting with [exploration.ipynb](notebooks/exploration.ipynb). When opening a notebook in your editor, select the Python kernel from the project's `.venv` environment.
 
@@ -333,6 +334,36 @@ best_config = results[best_name]["configuration"]
 Pass `preprocessor_factory` when learned preprocessing is needed, following the training-only fit rules above. Every configuration uses the same folds and gets fresh preprocessing for each fold. Candidate names include the method, a per-method index, and the supplied settings. Every requested entry is retained, including duplicate settings, with complete effective configuration snapshots, fold metrics, fitting times, and OOF arrays. An empty configuration list raises an error.
 
 The existing report and plot helpers accept these results directly. Select small candidate lists using development data and keep each result for review; the example values are starting choices for demonstrating the API. The example uses default classification thresholds. Threshold selection using OOF scores follows separately, and the reserved local test set stays untouched during selection.
+
+### Select classification thresholds
+
+`ThresholdTuner` in `src/threshold_tuning.py` tries explicit threshold grids against the existing OOF scores. Supply the same folds and development labels used for model comparison. A grid is required for each trained method; configurations of that method share the grid. Logistic scores are probabilities, while ridge, MSE, and SVM use raw decision scores, so choose grids in their respective score units. For the methods in the hyperparameter example:
+
+```python
+from src.threshold_tuning import ThresholdTuner
+
+default_results = results
+tuner = ThresholdTuner(
+    {
+        "ridge_regression": [-0.5, -0.25, 0.0, 0.25, 0.5],
+        "logistic_regression": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    },
+    folds,
+)
+tuned_results = tuner.run(default_results, y_dev)
+print(format_comparison_table(tuned_results))
+
+best_name = next(iter(tuned_results))
+best_config = tuned_results[best_name]["configuration"]
+comparison.save_report(default_results, "reports/default_thresholds.json")
+comparison.save_report(tuned_results, "reports/tuned_thresholds.json")
+```
+
+For each candidate, selection maximizes mean positive-class F1 across the original validation folds. The original cutoff is always included. Ties retain it if it is optimal, then follow the supplied grid order. A score at or above the cutoff predicts `+1`. The always-negative baseline remains unchanged. Models are not refit, and their scores, ROC-AUC, training losses, and original fitting times remain unchanged.
+
+The returned results have updated predictions, fold metrics, summaries, and threshold configuration, and are ranked by tuned mean F1. The original results are preserved separately. Each tuned candidate also records `threshold_tuning`: its original cutoff/summary, selected cutoff, and every tried threshold's mean F1. JSON reports retain this information, and the table/plot helpers label tuned output as development threshold-selection results. Tuning requires the in-memory OOF arrays from `comparison.run`; the compact JSON reports omit those arrays.
+
+These tuned metrics are **development selection scores**. Each OOF prediction comes from a model trained on other rows, but choosing its cutoff uses the development labels. The resulting score can be optimistic after selection. Freeze the chosen model settings and cutoff before the one final evaluation on the reserved local test set.
 
 ### Save a comparison report
 

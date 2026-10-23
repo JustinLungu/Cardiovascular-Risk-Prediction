@@ -54,6 +54,8 @@ def save_comparison_report(results, folds, output_path, fold_seed=None, metadata
                 for fold in result["fold_results"]
             ],
         }
+        if "threshold_tuning" in result:
+            report["results"][name]["threshold_tuning"] = result["threshold_tuning"]
 
     # Serialize before opening the file, so invalid values preserve prior output.
     serialized = json.dumps(report, indent=2, default=_json_default, allow_nan=False)

@@ -97,6 +97,7 @@ def format_comparison_table(results):
 
     Cells show the mean and population standard deviation to four decimals.
     Formatting preserves the results, their order, and their full precision.
+    Tuned results include a note identifying the use of development labels.
     """
     metrics = ("f1", "precision", "recall", "accuracy", "roc_auc")
     lines = [
@@ -111,4 +112,8 @@ def format_comparison_table(results):
         # Names may contain Markdown separators or line breaks.
         label = str(name).replace("|", "\\|").replace("\n", " ")
         lines.append("| " + " | ".join([label] + cells) + " |")
+    if any("threshold_tuning" in result for result in results.values()):
+        lines.extend(
+            ["", "Scores after threshold selection using development OOF labels."]
+        )
     return "\n".join(lines)

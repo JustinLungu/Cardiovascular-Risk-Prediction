@@ -12,6 +12,7 @@ def plot_model_comparison(results, ax=None):
     F1 summaries; no training or score recalculation is needed. Return (fig, ax)
     for notebook customization, display, or saving. An optional ax reuses an
     existing Matplotlib axes; otherwise create a figure sized for the model list.
+    Tuned results are labeled as development threshold-selection scores.
     """
     if not results:
         raise ValueError("At least one model result is required for plotting.")
@@ -33,6 +34,11 @@ def plot_model_comparison(results, ax=None):
     ax.set_xlim(min(0.0, min(means - stds)) - 0.02, max(1.0, max(means + stds)) + 0.02)
     ax.set_xlabel("Positive-class F1")
     ax.set_title("Validation F1: mean ± one fold standard deviation")
+    if any("threshold_tuning" in result for result in results.values()):
+        ax.set_title(
+            "Development F1 after threshold selection\n"
+            "Mean ± one fold standard deviation"
+        )
     ax.set_axisbelow(True)
     ax.grid(axis="x", alpha=0.25)
     return ax.figure, ax
