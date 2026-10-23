@@ -69,7 +69,7 @@ bash scripts/prepare_data.sh
 | Module | Responsibility |
 | --- | --- |
 | `src/train_test_split.py` | `TrainTestSplit` and development/holdout preparation. |
-| `src/cross_validation.py` | Reusable stratified fold indices. |
+| `src/cross_validation.py` | Shared stratified fold indices and the `CrossValidator` runner. |
 | `src/model_inputs.py` | Intercept columns and training-label conversion. |
 | `src/training.py` | Fit the existing course models. |
 | `src/prediction.py` | Class predictions, continuous scores, and the baseline. |
@@ -240,6 +240,28 @@ print(fold_result["metrics"])
 ```
 
 The result contains `metrics`, `training_loss`, `y_pred`, and `y_score`; prediction arrays retain validation row order for later out-of-fold collection. Configure `ModelEvaluator(method="always_negative_baseline")` for the reference predictor, which skips preprocessing and returns `None` for training loss. Validation labels must include both classes to calculate ROC-AUC.
+
+### Evaluate all development folds
+
+`CrossValidator` in `src/cross_validation.py` repeats one configured evaluator across the shared folds. Generate the folds once and reuse them for every candidate. This example assumes finite features that need no learned preprocessing:
+
+```python
+from src.cross_validation import CrossValidator, stratified_k_fold
+from src.evaluation import ModelEvaluator
+
+folds = stratified_k_fold(y_dev, k=5, seed=42)
+evaluator = ModelEvaluator(method="ridge_regression", lmbd=0.1)
+validator = CrossValidator(evaluator, folds)
+cv_result = validator.run(X_dev, y_dev)
+
+print(cv_result["fold_results"][0]["metrics"])
+oof_predictions = cv_result["oof_y_pred"]
+oof_scores = cv_result["oof_y_score"]
+```
+
+For learned preprocessing, pass `preprocessor_factory` to `CrossValidator`: a callable that constructs a new preprocessor for each fold, such as your preprocessing class or a `lambda` supplying its settings. Each instance follows the `fit(X_train, y_train)` / `transform(X)` interface above. Pass a constructor rather than an already-created instance; fitting stays inside each fold. The production preprocessing implementation is still pending.
+
+`fold_results` contains the one-fold result dictionaries in the same order as `folds`. The out-of-fold (OOF) arrays follow the original development row order, so they align with `y_dev` and development IDs. Each row receives a prediction from a model trained on the other folds. The runner checks that each fold separates training and validation rows and that every development row validates exactly once, before fitting any models. Pass only development data; the reserved local test set stays separate.
 
 ### Final evaluation and submission
 
