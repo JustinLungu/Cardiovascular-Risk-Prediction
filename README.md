@@ -66,6 +66,16 @@ bash scripts/prepare_data.sh
 
 `implementations.py` and `run.py` stay at the repository root because the course grading tests expect them there. The former contains the six required ML methods; the latter is a thin entry point for reproducing predictions. Other reusable code lives in `src/`, with data preparation in `src/data_prep/` and exploration in `src/data_exploration/`.
 
+| Module | Responsibility |
+| --- | --- |
+| `src/train_test_split.py` | `TrainTestSplit` and development/holdout preparation. |
+| `src/cross_validation.py` | Reusable stratified fold indices. |
+| `src/model_inputs.py` | Intercept columns and training-label conversion. |
+| `src/training.py` | Fit the existing course models. |
+| `src/prediction.py` | Class predictions, continuous scores, and the baseline. |
+| `src/metrics.py` | Classification metric calculations. |
+| `src/evaluation.py` | `ModelEvaluator`: model settings and one-fold evaluation. |
+
 Exploratory notebooks live in `notebooks/`, starting with [exploration.ipynb](notebooks/exploration.ipynb). When opening a notebook in your editor, select the Python kernel from the project's `.venv` environment.
 
 ## Model evaluation protocol
@@ -87,7 +97,7 @@ Reuse the existing stratified 60/20/20 partitions from `src/train_test_split.py`
 For an already-loaded split dictionary returned by `TrainTestSplit`, prepare the two datasets with:
 
 ```python
-from src.training import prepare_development_and_holdout
+from src.train_test_split import prepare_development_and_holdout
 
 development, holdout = prepare_development_and_holdout(parts)
 X_dev, y_dev = development["X"], development["y"]
@@ -148,18 +158,18 @@ Select hyperparameters and prediction thresholds using development cross-validat
 
 ### Model inputs and predictions
 
-Use the helpers in `src/training.py` to keep model conventions consistent:
+Use `src/model_inputs.py` for model inputs and `src/prediction.py` for predictions, with these conventions:
 
 | Models | Training labels | Prediction scores | Default threshold |
 | --- | --- | --- | --- |
 | Least squares (closed form, GD, SGD), ridge, and linear SVM | `{-1, +1}` | Linear decision scores | `0.0` |
 | Logistic and regularized logistic regression | `{0, 1}` | Probability of `+1` | `0.5` |
 
-`prepare_training_labels(y, logistic=False)` accepts the original `{-1, +1}` labels and returns a separate training array. Set `logistic=True` to map `-1` to `0` and keep `+1` as `1`; keep the original labels for evaluation.
+`prepare_training_labels(y, logistic=False)` in `src/model_inputs.py` accepts the original `{-1, +1}` labels and returns a separate training array. Set `logistic=True` to map `-1` to `0` and keep `+1` as `1`; keep the original labels for evaluation.
 
-`add_intercept(X)` prepends one column of ones after preprocessing, giving the models an intercept weight at `w[0]`. Use it once on training features before passing them to a course training function. The existing regularized implementations penalize all weights, including this intercept.
+`add_intercept(X)` in the same module prepends one column of ones after preprocessing, giving the models an intercept weight at `w[0]`. Use it once on training features before passing them to a course training function. The existing regularized implementations penalize all weights, including this intercept.
 
-`predict_from_weights(X, w, logistic=False, threshold=None)` takes preprocessed prediction features **without** an intercept column and adds it internally. It returns `(y_pred, y_score)` with `{-1, +1}` predictions and continuous scores for ROC-AUC. Set `logistic=True` for logistic weights. A custom `threshold` changes class predictions while preserving scores; equality with the threshold predicts `+1`. Select thresholds using development validation results.
+`predict_from_weights(X, w, logistic=False, threshold=None)` in `src/prediction.py` takes preprocessed prediction features **without** an intercept column and adds it internally. It returns `(y_pred, y_score)` with `{-1, +1}` predictions and continuous scores for ROC-AUC. Set `logistic=True` for logistic weights. A custom `threshold` changes class predictions while preserving scores; equality with the threshold predicts `+1`. Select thresholds using development validation results.
 
 ### Training models
 
@@ -172,7 +182,8 @@ Iterative methods start from zero weights and use `max_it` updates with learning
 For ridge, use `train_model(X_train, y_train, method="ridge_regression", lmbd=0.1)`. The strength `lmbd` must be a finite, nonnegative scalar; larger values apply stronger shrinkage. Setting it to `0.0` matches least squares when the design matrix has full column rank. A positive strength also makes collinear columns solvable. The returned training half-MSE excludes the regularization penalty. Select `lmbd` using development validation results.
 
 ```python
-from src.training import train_model, predict_from_weights
+from src.training import train_model
+from src.prediction import predict_from_weights
 from src.metrics import evaluate
 
 w, training_loss = train_model(
@@ -199,15 +210,36 @@ For linear SVM, call `train_model(X_train, y_train, method="svm", lmbd=0.1)`. It
 
 ### Always-negative baseline
 
-`always_negative_baseline(X)` in `src/training.py` returns `(y_pred, y_score)`, predicting `-1` for every feature row with constant decision scores of `-1.0`. It needs no fitting or preprocessing. With both classes present, precision, recall, and F1 are `0.0`, ROC-AUC is `0.5`, and accuracy equals the share of negative labels. This reference shows how much accuracy can come from class imbalance alone.
+`always_negative_baseline(X)` in `src/prediction.py` returns `(y_pred, y_score)`, predicting `-1` for every feature row with constant decision scores of `-1.0`. It needs no fitting or preprocessing. With both classes present, precision, recall, and F1 are `0.0`, ROC-AUC is `0.5`, and accuracy equals the share of negative labels. This reference shows how much accuracy can come from class imbalance alone.
 
 ```python
-from src.training import always_negative_baseline
+from src.prediction import always_negative_baseline
 from src.metrics import evaluate
 
 y_pred, y_score = always_negative_baseline(X_val)
 baseline_metrics = evaluate(y_val, y_pred, y_score)
 ```
+
+### Evaluate one validation fold
+
+`ModelEvaluator` in `src/evaluation.py` keeps the model method, threshold, and training parameters together. Configure it once, then call `evaluator.evaluate_fold(X_train, y_train, X_val, y_val, ...)` on the development rows selected by `stratified_k_fold`. The evaluator combines preprocessing, training, prediction, and metrics. Settings such as `lmbd`, `max_it`, `gamma`, and `seed` are forwarded to `train_model` on each call.
+
+For learned preprocessing, pass a fresh instance as `preprocessor` to each `evaluate_fold` call. It must provide `fit(X_train, y_train)` and `transform(X)`: fitting receives only training features and their original `{-1, +1}` labels, then transformation runs on training and validation separately. Transformations must preserve row counts/order and produce the same feature columns for both portions, without an intercept column. The evaluator copies input arrays before preprocessing so operations in place preserve the caller's raw data.
+
+The production preprocessing module is still a placeholder. Use `preprocessor=None` only when no learned preprocessing is needed, as in this finite synthetic example:
+
+```python
+from src.evaluation import ModelEvaluator
+
+evaluator = ModelEvaluator(method="ridge_regression", lmbd=0.1)
+fold_result = evaluator.evaluate_fold(
+    X_train=[[0.0], [1.0]], y_train=[-1, 1],
+    X_val=[[0.25], [0.75]], y_val=[-1, 1],
+)
+print(fold_result["metrics"])
+```
+
+The result contains `metrics`, `training_loss`, `y_pred`, and `y_score`; prediction arrays retain validation row order for later out-of-fold collection. Configure `ModelEvaluator(method="always_negative_baseline")` for the reference predictor, which skips preprocessing and returns `None` for training loss. Validation labels must include both classes to calculate ROC-AUC.
 
 ### Final evaluation and submission
 
