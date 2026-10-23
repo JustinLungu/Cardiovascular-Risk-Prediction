@@ -161,13 +161,13 @@ Use the helpers in `src/training.py` to keep model conventions consistent:
 
 `predict_from_weights(X, w, logistic=False, threshold=None)` takes preprocessed prediction features **without** an intercept column and adds it internally. It returns `(y_pred, y_score)` with `{-1, +1}` predictions and continuous scores for ROC-AUC. Set `logistic=True` for logistic weights. A custom `threshold` changes class predictions while preserving scores; equality with the threshold predicts `+1`. Select thresholds using development validation results.
 
-### Training least-squares and ridge methods
+### Training models
 
-`train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1)` in `src/training.py` calls the existing functions in `implementations.py`. Choose `least_squares`, `mean_squared_error_gd`, or `mean_squared_error_sgd` for three ways to fit the same least-squares model, or `ridge_regression` for its L2-regularized version.
+`train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1)` in `src/training.py` calls the existing functions in `implementations.py`. Choose `least_squares`, `mean_squared_error_gd`, or `mean_squared_error_sgd` for three ways to fit the same least-squares model, `ridge_regression` for its L2-regularized version, or `logistic_regression` for logistic classification.
 
-Pass preprocessed, finite features **without** an intercept column and the original `{-1, +1}` labels. The helper adds the intercept and prepares a separate label array. It returns `(w, loss)`, where `loss` is the final training half-MSE; use `evaluate(...)` for classification metrics. Closed-form least squares requires linearly independent columns after adding the intercept; a singular matrix raises NumPy's `LinAlgError`.
+Pass preprocessed, finite features **without** an intercept column and the original `{-1, +1}` labels. The helper adds the intercept and prepares a separate label array. It returns `(w, loss)`: final training half-MSE for least squares/ridge, or mean negative log-likelihood for logistic regression. Use `evaluate(...)` for classification metrics. Closed-form least squares requires linearly independent columns after adding the intercept; a singular matrix raises NumPy's `LinAlgError`.
 
-GD and SGD start from zero weights and use `max_it` updates with learning rate `gamma`. SGD uses `seed` for each call and restores the previous NumPy random state afterward. Select iteration counts and learning rates using development validation results.
+Iterative methods start from zero weights and use `max_it` updates with learning rate `gamma`. SGD uses `seed` for each call and restores the previous NumPy random state afterward. Select iteration counts and learning rates using development validation results.
 
 For ridge, use `train_model(X_train, y_train, method="ridge_regression", lmbd=0.1)`. The strength `lmbd` must be a finite, nonnegative scalar; larger values apply stronger shrinkage. Setting it to `0.0` matches least squares when the design matrix has full column rank. A positive strength also makes collinear columns solvable. The returned training half-MSE excludes the regularization penalty. Select `lmbd` using development validation results.
 
@@ -181,6 +181,16 @@ w, training_loss = train_model(
 )
 y_pred, y_score = predict_from_weights(X_val, w)
 validation_metrics = evaluate(y_val, y_pred, y_score)
+```
+
+For `method="logistic_regression"`, the training helper converts a copy of the labels to `{0, 1}`. Use `logistic=True` when predicting from its weights to obtain positive-class probabilities and apply the default `0.5` threshold. Keep the original `{-1, +1}` labels for evaluation:
+
+```python
+w, training_loss = train_model(
+    X_train, y_train, method="logistic_regression", max_it=1000, gamma=0.01,
+)
+y_pred, probabilities = predict_from_weights(X_val, w, logistic=True)
+validation_metrics = evaluate(y_val, y_pred, probabilities)
 ```
 
 ### Always-negative baseline

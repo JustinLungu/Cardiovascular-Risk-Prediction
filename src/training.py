@@ -101,17 +101,19 @@ def predict_from_weights(X, w, logistic=False, threshold=None):
 def train_model(
     X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1
 ):
-    """Train a least-squares or ridge model and return the course (w, loss).
+    """Train a model using the course implementations and return (w, loss).
 
     X must be preprocessed, finite, and without an intercept column. Labels
     use {-1, +1}. Supported methods are least_squares, mean_squared_error_gd,
-    mean_squared_error_sgd, and ridge_regression. GD/SGD start from zero weights
-    and use max_it and gamma; SGD is seeded without changing the caller's RNG
-    state. Ridge uses a finite nonnegative lmbd, including for the intercept.
-    The returned loss is half-MSE, excluding any regularization penalty.
+    mean_squared_error_sgd, ridge_regression, and logistic_regression. Logistic
+    training converts labels to {0, 1} internally. Iterative methods start from
+    zero weights and use max_it and gamma; SGD preserves the caller's RNG state.
+    Ridge uses a finite nonnegative lmbd, including for the intercept. Loss is
+    mean negative log-likelihood for logistic regression and half-MSE otherwise,
+    excluding any regularization penalty.
     """
     X_fit = add_intercept(X)
-    y_fit = prepare_training_labels(y)
+    y_fit = prepare_training_labels(y, logistic=method == "logistic_regression")
     # Training needs at least one row, with a label for every feature row.
     if len(y_fit) == 0 or len(X_fit) != len(y_fit):
         raise ValueError(
@@ -134,6 +136,8 @@ def train_model(
     w0 = np.zeros(X_fit.shape[1])
     if method == "mean_squared_error_gd":
         return implementations.mean_squared_error_gd(y_fit, X_fit, w0, max_it, gamma)
+    if method == "logistic_regression":
+        return implementations.logistic_regression(y_fit, X_fit, w0, max_it, gamma)
     if method == "mean_squared_error_sgd":
         # The course SGD uses NumPy's global RNG; restore it after the seeded call.
         previous_state = np.random.get_state()
