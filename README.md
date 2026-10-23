@@ -81,11 +81,14 @@ src/
 ├── evaluation/                # Validation, scoring, and model selection
 │   ├── metrics.py
 │   ├── evaluator.py
+│   ├── holdout.py
 │   ├── cross_validation.py
 │   ├── model_comparison.py
 │   └── threshold_tuning.py
 └── reporting/                 # Saved results and plots
     ├── comparison_report.py
+    ├── holdout_report.py
+    ├── json_io.py
     └── visualization.py
 ```
 
@@ -100,8 +103,11 @@ Import helpers from their modules, for example `from src.models.training import 
 | `src/models/prediction.py` | Class predictions, continuous scores, and the baseline. |
 | `src/evaluation/metrics.py` | Classification metric calculations. |
 | `src/evaluation/evaluator.py` | `ModelEvaluator`: model settings and one-fold evaluation. |
+| `src/evaluation/holdout.py` | Freeze one selected configuration, refit on development data, and evaluate the reserved labeled holdout. |
 | `src/evaluation/model_comparison.py` | `ModelComparison`: evaluate named candidates on shared folds and format their ranked results. |
 | `src/reporting/comparison_report.py` | Save comparison settings, exact folds, metrics, and fitting times as JSON. |
+| `src/reporting/holdout_report.py` | Save final holdout metrics, confusion matrix, configuration, and row IDs as JSON. |
+| `src/reporting/json_io.py` | Shared full-precision JSON writing with NumPy support. |
 | `src/reporting/visualization.py` | Plot mean validation F1 with fold standard deviation error bars. |
 | `src/evaluation/threshold_tuning.py` | Select thresholds from development OOF scores while retaining the original results. |
 
@@ -436,6 +442,55 @@ To plot a saved report without retraining, load it with `json.load` and pass `re
 
 After selecting and freezing a configuration, refit preprocessing and the model on all 80% development data. Apply that fitted pipeline and its selected threshold to the reserved 20% local test set for the final local evaluation.
 
+Use `HoldoutEvaluator` with the existing `development` and `holdout` dictionaries
+from `prepare_development_and_holdout`. Select the candidate using development
+results before passing the holdout:
+
+```python
+from src.evaluation.holdout import HoldoutEvaluator
+
+# tuned_results are already ranked by mean development-fold F1.
+best_name = next(iter(tuned_results))
+final_evaluator = HoldoutEvaluator(
+    tuned_results[best_name]["configuration"],
+    preprocessor_factory=comparison.preprocessor_factory,
+)
+holdout_result = final_evaluator.evaluate(development, holdout)
+report_path = final_evaluator.save_report(
+    holdout_result,
+    metadata={
+        "selected_candidate": best_name,
+        "selection_data": "development_oof",
+        "dataset": "Record the dataset source and row order",
+        "preprocessing": None,  # Record the actual class/settings when used.
+    },
+)
+print(holdout_result["metrics"])
+print(holdout_result["confusion_matrix"])
+```
+
+The evaluator copies the effective configuration, including the selected cutoff
+and training seed. It creates fresh preprocessing with the chosen factory,
+fits it on all development rows, and applies that fitted state to the holdout.
+It checks that IDs are unique and disjoint before fitting. Inputs must have
+aligned features, labels, and IDs; both holdout classes are required for ROC-AUC.
+Keep the factory's settings fixed and record them in metadata. Use no factory
+only when no learned preprocessing is required, as in the finite toy examples.
+
+The returned metrics describe this one holdout evaluation, without fold means
+or standard deviations. The confusion matrix uses labels `[-1, +1]`, actual
+labels as rows, and predicted labels as columns: `[[tn, fp], [fn, tp]]`.
+Predictions and scores remain in memory, aligned with `data["holdout_ids"]`.
+The JSON at `results/holdout_evaluation.json` saves the configuration, metrics,
+confusion counts/matrix, fitting diagnostics, row counts, exact row IDs, and
+metadata. A different output path can be passed to `save_report`.
+
+Use the reserved test set once after selection; do not tune settings or cutoffs
+using its results. Real-data preprocessing and development-model selection
+remain pending; the saved synthetic demonstrations do not select a cardiovascular
+model. Once a real evaluation is recorded, its JSON `configuration` and the
+preprocessing settings in `metadata` provide the handoff for later refitting.
+
 After recording the final local result, refit the selected pipeline on all labeled data before generating competition benchmark predictions through `run.py`.
 
-The final training and evaluation workflow uses NumPy and the Python standard library, with permitted visualization libraries for plots. The existing Pandas/scikit-learn experiments remain temporary reference work until the NumPy replacement is verified; their removal is scheduled for the end of the model comparison work.
+The final training and evaluation workflow uses NumPy and the Python standard library, with permitted visualization libraries for plots. This branch stops after the holdout-evaluation implementation for teammate integration. Notebook migration, obsolete wrapper removal, and the remaining documentation work (roadmap steps 25–27) are deferred to a separate refactor branch after team agreement.
