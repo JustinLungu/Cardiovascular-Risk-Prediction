@@ -69,7 +69,7 @@ bash scripts/prepare_data.sh
 | Module | Responsibility |
 | --- | --- |
 | `src/train_test_split.py` | `TrainTestSplit` and development/holdout preparation. |
-| `src/cross_validation.py` | Shared stratified fold indices and the `CrossValidator` runner. |
+| `src/cross_validation.py` | Shared stratified folds, the `CrossValidator` runner, and metric summaries. |
 | `src/model_inputs.py` | Intercept columns and training-label conversion. |
 | `src/training.py` | Fit the existing course models. |
 | `src/prediction.py` | Class predictions, continuous scores, and the baseline. |
@@ -254,7 +254,7 @@ evaluator = ModelEvaluator(method="ridge_regression", lmbd=0.1)
 validator = CrossValidator(evaluator, folds)
 cv_result = validator.run(X_dev, y_dev)
 
-print(cv_result["fold_results"][0]["metrics"])
+print(cv_result["summary"]["f1"])  # {"mean": ..., "std": ...}
 oof_predictions = cv_result["oof_y_pred"]
 oof_scores = cv_result["oof_y_score"]
 ```
@@ -262,6 +262,10 @@ oof_scores = cv_result["oof_y_score"]
 For learned preprocessing, pass `preprocessor_factory` to `CrossValidator`: a callable that constructs a new preprocessor for each fold, such as your preprocessing class or a `lambda` supplying its settings. Each instance follows the `fit(X_train, y_train)` / `transform(X)` interface above. Pass a constructor rather than an already-created instance; fitting stays inside each fold. The production preprocessing implementation is still pending.
 
 `fold_results` contains the one-fold result dictionaries in the same order as `folds`. The out-of-fold (OOF) arrays follow the original development row order, so they align with `y_dev` and development IDs. Each row receives a prediction from a model trained on the other folds. The runner checks that each fold separates training and validation rows and that every development row validates exactly once, before fitting any models. Pass only development data; the reserved local test set stays separate.
+
+`summary` reports `{"mean": ..., "std": ...}` for accuracy, precision, recall, F1, and ROC-AUC. Each fold counts equally, including when rounding produces slightly different validation sizes. Standard deviation uses `ddof=0` and describes how much the observed fold scores vary; it is not a confidence interval. For example, F1 values of `0.6` and `0.8` have mean `0.7` and standard deviation `0.1`. These statistics summarize the individual fold metrics; calculating a metric once over all OOF predictions can give a different result. Training loss stays in each fold result because different model families use different loss functions.
+
+To summarize existing fold results without training again, call `summarize_fold_results(cv_result["fold_results"])` from `src/cross_validation.py`.
 
 ### Final evaluation and submission
 

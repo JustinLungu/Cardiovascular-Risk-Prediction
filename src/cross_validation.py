@@ -44,6 +44,27 @@ def stratified_k_fold(y, k=5, seed=42):
     return folds
 
 
+def summarize_fold_results(fold_results):
+    """Return the unweighted mean and population std for each fold metric.
+
+    Accept the nonempty list of results returned by ModelEvaluator. All folds
+    must provide the same metric keys. Each fold counts equally, even when
+    validation sizes differ. Inputs and individual fold metrics are preserved.
+    """
+    if not fold_results:
+        raise ValueError("At least one fold result is required for a summary.")
+
+    summary = {}
+    for metric in fold_results[0]["metrics"]:
+        values = [result["metrics"][metric] for result in fold_results]
+        summary[metric] = {
+            "mean": float(np.mean(values)),
+            # ddof=0 describes the spread of the observed fold scores.
+            "std": float(np.std(values, ddof=0)),
+        }
+    return summary
+
+
 class CrossValidator:
     """Evaluate a configured ModelEvaluator on shared development-data folds."""
 
@@ -53,13 +74,14 @@ class CrossValidator:
         self.preprocessor_factory = preprocessor_factory
 
     def run(self, X, y):
-        """Return per-fold results and out-of-fold predictions for development data.
+        """Return a metric summary, fold results, and OOF development predictions.
 
         Reuse folds from stratified_k_fold across model candidates. Provide a
         preprocessor_factory that creates a fresh fit/transform instance per
         fold, or None when no learned preprocessing is needed. Never pass the
         reserved holdout here. The returned fold_results follow fold order;
         oof_y_pred and oof_y_score follow the original X/y row order.
+        summary contains the unweighted mean and population std of each metric.
         """
         X = np.asarray(X)
         y = np.asarray(y)
@@ -92,6 +114,7 @@ class CrossValidator:
             oof_y_score[validation_rows] = result["y_score"]
 
         return {
+            "summary": summarize_fold_results(fold_results),
             "fold_results": fold_results,
             "oof_y_pred": oof_y_pred,
             "oof_y_score": oof_y_score,
