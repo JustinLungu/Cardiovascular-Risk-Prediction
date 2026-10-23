@@ -146,6 +146,21 @@ Rank candidate configurations by mean positive-class F1 across the five validati
 
 Select hyperparameters and prediction thresholds using development cross-validation. For threshold selection, collect out-of-fold scores: each development row's score comes from a model trained on the other folds. Save model settings, thresholds, seeds, and per-fold results so experiments can be reproduced.
 
+### Model inputs and predictions
+
+Use the helpers in `src/training.py` to keep model conventions consistent:
+
+| Models | Training labels | Prediction scores | Default threshold |
+| --- | --- | --- | --- |
+| Least squares (closed form, GD, SGD), ridge, and linear SVM | `{-1, +1}` | Linear decision scores | `0.0` |
+| Logistic and regularized logistic regression | `{0, 1}` | Probability of `+1` | `0.5` |
+
+`prepare_training_labels(y, logistic=False)` accepts the original `{-1, +1}` labels and returns a separate training array. Set `logistic=True` to map `-1` to `0` and keep `+1` as `1`; keep the original labels for evaluation.
+
+`add_intercept(X)` prepends one column of ones after preprocessing, giving the models an intercept weight at `w[0]`. Use it once on training features before passing them to a course training function. The existing regularized implementations penalize all weights, including this intercept.
+
+`predict_from_weights(X, w, logistic=False, threshold=None)` takes preprocessed prediction features **without** an intercept column and adds it internally. It returns `(y_pred, y_score)` with `{-1, +1}` predictions and continuous scores for ROC-AUC. Set `logistic=True` for logistic weights. A custom `threshold` changes class predictions while preserving scores; equality with the threshold predicts `+1`. Select thresholds using development validation results.
+
 ### Always-negative baseline
 
 `always_negative_baseline(X)` in `src/training.py` returns `(y_pred, y_score)`, predicting `-1` for every feature row with constant decision scores of `-1.0`. It needs no fitting or preprocessing. With both classes present, precision, recall, and F1 are `0.0`, ROC-AUC is `0.5`, and accuracy equals the share of negative labels. This reference shows how much accuracy can come from class imbalance alone.
