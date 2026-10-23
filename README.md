@@ -77,6 +77,7 @@ bash scripts/prepare_data.sh
 | `src/evaluation.py` | `ModelEvaluator`: model settings and one-fold evaluation. |
 | `src/model_comparison.py` | `ModelComparison`: evaluate named candidates on shared folds and format their ranked results. |
 | `src/reporting.py` | Save comparison settings, exact folds, metrics, and fitting times as JSON. |
+| `src/visualization.py` | Plot mean validation F1 with fold standard deviation error bars. |
 
 Exploratory notebooks live in `notebooks/`, starting with [exploration.ipynb](notebooks/exploration.ipynb). When opening a notebook in your editor, select the Python kernel from the project's `.venv` environment.
 
@@ -325,6 +326,23 @@ The JSON contains ranked model configurations, metric means and standard deviati
 `fold_seed` records the seed used when generating the supplied folds; it does not generate or change them. An unknown seed is saved as `null`. The saved indices allow exact fold reuse with the same development data and row order. Reports use Python's standard JSON format and can be reopened with `json.load`; `report["results"]` also works with `format_comparison_table`.
 
 The output directory is created automatically and an existing report at the same path is replaced. Generated files under `reports/` are gitignored.
+
+### Plot a comparison
+
+`plot_model_comparison` in `src/visualization.py` draws a horizontal F1 chart using the existing metric summaries. It keeps the comparison order, with the highest-ranked candidate at the top. Error bars show one population standard deviation across folds (`ddof=0`), describing fold variation rather than a confidence interval. The axis includes the full error bars, even when mean ± standard deviation extends beyond the 0–1 score range.
+
+```python
+from pathlib import Path
+import matplotlib.pyplot as plt
+from src.visualization import plot_model_comparison
+
+fig, ax = plot_model_comparison(results)
+Path("reports").mkdir(exist_ok=True)
+fig.savefig("reports/model_comparison_f1.png", dpi=150, bbox_inches="tight")
+plt.show()
+```
+
+To plot a saved report without retraining, load it with `json.load` and pass `report["results"]` instead. The function returns the Matplotlib figure and axes for customization; pass `ax=...` to draw on an existing subplot. The plotting helper preserves the results and leaves saving/display to the caller. Plot files under `reports/` are gitignored.
 
 ### Final evaluation and submission
 
