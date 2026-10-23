@@ -6,6 +6,8 @@
 
 import numpy as np
 
+import implementations
+
 
 def prepare_development_and_holdout(parts):
     """Combine TrainTestSplit's train/val arrays and retain its test partition.
@@ -94,3 +96,45 @@ def predict_from_weights(X, w, logistic=False, threshold=None):
         raise ValueError("The prediction threshold must be a finite scalar.")
     y_pred = np.where(y_score >= threshold, 1, -1)
     return y_pred, y_score
+
+
+def train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42):
+    """Train a least-squares variant and return the course function's (w, loss).
+
+    X must be preprocessed, finite, and without an intercept column. Labels
+    use {-1, +1}. Supported methods are least_squares, mean_squared_error_gd,
+    and mean_squared_error_sgd. GD/SGD start from zero weights and use max_it
+    and gamma; SGD is seeded per call without changing the caller's RNG state.
+    The returned training loss is half the mean squared error.
+    """
+    X_fit = add_intercept(X)
+    y_fit = prepare_training_labels(y)
+    # Training needs at least one row, with a label for every feature row.
+    if len(y_fit) == 0 or len(X_fit) != len(y_fit):
+        raise ValueError(
+            "Training features and labels must have matching nonzero lengths."
+        )
+    # Imputation and other learned preprocessing belong before this call.
+    if not np.isfinite(X_fit).all():
+        raise ValueError(
+            "Training features must be finite; complete preprocessing first."
+        )
+
+    if method == "least_squares":
+        return implementations.least_squares(y_fit, X_fit)
+
+    w0 = np.zeros(X_fit.shape[1])
+    if method == "mean_squared_error_gd":
+        return implementations.mean_squared_error_gd(y_fit, X_fit, w0, max_it, gamma)
+    if method == "mean_squared_error_sgd":
+        # The course SGD uses NumPy's global RNG; restore it after the seeded call.
+        previous_state = np.random.get_state()
+        try:
+            np.random.seed(seed)
+            return implementations.mean_squared_error_sgd(
+                y_fit, X_fit, w0, max_it, gamma
+            )
+        finally:
+            np.random.set_state(previous_state)
+
+    raise ValueError(f"Unknown training method: {method!r}.")
