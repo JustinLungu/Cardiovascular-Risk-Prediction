@@ -75,6 +75,7 @@ bash scripts/prepare_data.sh
 | `src/prediction.py` | Class predictions, continuous scores, and the baseline. |
 | `src/metrics.py` | Classification metric calculations. |
 | `src/evaluation.py` | `ModelEvaluator`: model settings and one-fold evaluation. |
+| `src/model_comparison.py` | `ModelComparison`: evaluate named candidates on shared folds and format their ranked results. |
 
 Exploratory notebooks live in `notebooks/`, starting with [exploration.ipynb](notebooks/exploration.ipynb). When opening a notebook in your editor, select the Python kernel from the project's `.venv` environment.
 
@@ -266,6 +267,40 @@ For learned preprocessing, pass `preprocessor_factory` to `CrossValidator`: a ca
 `summary` reports `{"mean": ..., "std": ...}` for accuracy, precision, recall, F1, and ROC-AUC. Each fold counts equally, including when rounding produces slightly different validation sizes. Standard deviation uses `ddof=0` and describes how much the observed fold scores vary; it is not a confidence interval. For example, F1 values of `0.6` and `0.8` have mean `0.7` and standard deviation `0.1`. These statistics summarize the individual fold metrics; calculating a metric once over all OOF predictions can give a different result. Training loss stays in each fold result because different model families use different loss functions.
 
 To summarize existing fold results without training again, call `summarize_fold_results(cv_result["fold_results"])` from `src/cross_validation.py`.
+
+### Compare model candidates
+
+`ModelComparison` in `src/model_comparison.py` runs named `ModelEvaluator` instances on the same development folds and returns their complete CV results ranked by mean positive-class F1. Pass the shared folds generated above. For finite features that need no learned preprocessing:
+
+```python
+from src.evaluation import ModelEvaluator
+from src.model_comparison import ModelComparison, format_comparison_table
+
+candidates = {
+    "Baseline": ModelEvaluator("always_negative_baseline"),
+    "Least squares": ModelEvaluator("least_squares"),
+    "MSE (GD)": ModelEvaluator("mean_squared_error_gd", max_it=1000, gamma=0.01),
+    "MSE (SGD)": ModelEvaluator(
+        "mean_squared_error_sgd", max_it=1000, gamma=0.01, seed=42,
+    ),
+    "Ridge": ModelEvaluator("ridge_regression", lmbd=0.1),
+    "Logistic": ModelEvaluator("logistic_regression", max_it=1000, gamma=0.01),
+    "Regularized logistic": ModelEvaluator(
+        "reg_logistic_regression", lmbd=0.1, max_it=1000, gamma=0.01,
+    ),
+    "Linear SVM": ModelEvaluator("svm", lmbd=0.1, max_it=1000, gamma=0.01),
+}
+comparison = ModelComparison(candidates, folds)
+results = comparison.run(X_dev, y_dev)
+print(format_comparison_table(results))
+
+ridge_summary = results["Ridge"]["summary"]
+ridge_oof_scores = results["Ridge"]["oof_y_score"]
+```
+
+For learned preprocessing, pass `preprocessor_factory` to `ModelComparison` using the interface above. Every model uses that factory, with a fresh instance per fold and fitting on training rows only. The real preprocessing implementation is still pending. Keep the reserved local test set outside this workflow.
+
+The table shows F1, precision, recall, accuracy, and ROC-AUC as `mean ± std` to four decimal places. Ranking uses full-precision mean F1; ties keep the original candidate order. Complete summaries, fold results, and OOF arrays remain accessible by candidate name. The example settings demonstrate the API; select the actual model settings using development validation results.
 
 ### Final evaluation and submission
 
