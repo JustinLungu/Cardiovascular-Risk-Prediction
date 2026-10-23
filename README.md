@@ -76,6 +76,7 @@ bash scripts/prepare_data.sh
 | `src/metrics.py` | Classification metric calculations. |
 | `src/evaluation.py` | `ModelEvaluator`: model settings and one-fold evaluation. |
 | `src/model_comparison.py` | `ModelComparison`: evaluate named candidates on shared folds and format their ranked results. |
+| `src/reporting.py` | Save comparison settings, exact folds, metrics, and fitting times as JSON. |
 
 Exploratory notebooks live in `notebooks/`, starting with [exploration.ipynb](notebooks/exploration.ipynb). When opening a notebook in your editor, select the Python kernel from the project's `.venv` environment.
 
@@ -240,7 +241,7 @@ fold_result = evaluator.evaluate_fold(
 print(fold_result["metrics"])
 ```
 
-The result contains `metrics`, `training_loss`, `y_pred`, and `y_score`; prediction arrays retain validation row order for later out-of-fold collection. Configure `ModelEvaluator(method="always_negative_baseline")` for the reference predictor, which skips preprocessing and returns `None` for training loss. Validation labels must include both classes to calculate ROC-AUC.
+The result contains `metrics`, `training_loss`, `training_time_seconds`, `y_pred`, and `y_score`; prediction arrays retain validation row order for later out-of-fold collection. Timing covers the `train_model` call, including its input preparation, and excludes learned preprocessing, prediction, and metric calculation. Configure `ModelEvaluator(method="always_negative_baseline")` for the reference predictor, which skips preprocessing and returns `None` for training loss and `0.0` for training time. Validation labels must include both classes to calculate ROC-AUC.
 
 ### Evaluate all development folds
 
@@ -290,7 +291,7 @@ candidates = {
     ),
     "Linear SVM": ModelEvaluator("svm", lmbd=0.1, max_it=1000, gamma=0.01),
 }
-comparison = ModelComparison(candidates, folds)
+comparison = ModelComparison(candidates, folds, fold_seed=42)
 results = comparison.run(X_dev, y_dev)
 print(format_comparison_table(results))
 
@@ -301,6 +302,29 @@ ridge_oof_scores = results["Ridge"]["oof_y_score"]
 For learned preprocessing, pass `preprocessor_factory` to `ModelComparison` using the interface above. Every model uses that factory, with a fresh instance per fold and fitting on training rows only. The real preprocessing implementation is still pending. Keep the reserved local test set outside this workflow.
 
 The table shows F1, precision, recall, accuracy, and ROC-AUC as `mean ± std` to four decimal places. Ranking uses full-precision mean F1; ties keep the original candidate order. Complete summaries, fold results, and OOF arrays remain accessible by candidate name. The example settings demonstrate the API; select the actual model settings using development validation results.
+
+### Save a comparison report
+
+Each comparison result also contains a `configuration` snapshot and `training_time_seconds`, the sum of fitting times across its folds. The configuration records the method, effective threshold, and shared training-helper defaults with any explicit overrides. Defaults such as the SGD seed are therefore recorded even when omitted by the caller. Some helper settings apply only to particular methods; the baseline has no training parameters or threshold. Changing an evaluator's settings after a run preserves the configuration already recorded with that run.
+
+Save the results without training again:
+
+```python
+report_path = comparison.save_report(
+    results,
+    "reports/model_comparison.json",
+    metadata={
+        "dataset": "Describe the development dataset and its row order here",
+        "preprocessing": None,  # No learned preprocessing in the finite example.
+    },
+)
+```
+
+The JSON contains ranked model configurations, metric means and standard deviations, each fold's metrics/loss/fitting time, total fitting times, and the exact training/validation indices in their original order. OOF arrays remain in memory. Add the actual dataset source/order and preprocessing class/settings to `metadata` for your experiment. All metadata values must be JSON-compatible; NumPy arrays and scalars are supported.
+
+`fold_seed` records the seed used when generating the supplied folds; it does not generate or change them. An unknown seed is saved as `null`. The saved indices allow exact fold reuse with the same development data and row order. Reports use Python's standard JSON format and can be reopened with `json.load`; `report["results"]` also works with `format_comparison_table`.
+
+The output directory is created automatically and an existing report at the same path is replaced. Generated files under `reports/` are gitignored.
 
 ### Final evaluation and submission
 
