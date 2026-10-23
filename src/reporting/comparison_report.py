@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 
-
 def _json_default(value):
     """Convert NumPy arrays/scalars without rounding their numeric values."""
     if isinstance(value, np.ndarray):
@@ -26,9 +25,11 @@ def save_comparison_report(results, folds, output_path, fold_seed=None, metadata
     """
     folds = list(folds)
     report = {
+        "metadata": metadata if metadata is not None else {},
         "selection_metric": "f1",
         "positive_label": 1,
         "aggregation": {"fold_weighting": "equal", "std_ddof": 0},
+        "results": {},
         "cross_validation": {
             "n_folds": len(folds),
             "seed": fold_seed,
@@ -37,8 +38,6 @@ def save_comparison_report(results, folds, output_path, fold_seed=None, metadata
                 for training_rows, validation_rows in folds
             ],
         },
-        "metadata": metadata if metadata is not None else {},
-        "results": {},
     }
     for name, result in results.items():
         report["results"][name] = {
@@ -58,7 +57,9 @@ def save_comparison_report(results, folds, output_path, fold_seed=None, metadata
             report["results"][name]["threshold_tuning"] = result["threshold_tuning"]
 
     # Serialize before opening the file, so invalid values preserve prior output.
-    serialized = json.dumps(report, indent=2, default=_json_default, allow_nan=False)
+    serialized = json.dumps(
+        report, indent=2, default=_json_default, allow_nan=False, ensure_ascii=False
+    )
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(serialized + "\n", encoding="utf-8")

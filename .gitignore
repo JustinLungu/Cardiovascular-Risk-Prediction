@@ -15,7 +15,7 @@ __pycache__/
 /tests/
 
 # Generated model comparison reports
-/reports/
+/results/
 
 .vscode/
 .idea/

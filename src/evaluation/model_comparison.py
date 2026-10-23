@@ -79,7 +79,7 @@ class ModelComparison:
         )
 
     def save_report(
-        self, results, output_path="reports/model_comparison.json", metadata=None
+        self, results, output_path="results/model_comparison.json", metadata=None
     ):
         """Save these results with this comparison's original folds and seed.
 

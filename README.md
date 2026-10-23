@@ -380,8 +380,8 @@ print(format_comparison_table(tuned_results))
 
 best_name = next(iter(tuned_results))
 best_config = tuned_results[best_name]["configuration"]
-comparison.save_report(default_results, "reports/default_thresholds.json")
-comparison.save_report(tuned_results, "reports/tuned_thresholds.json")
+comparison.save_report(default_results, "results/default_thresholds.json")
+comparison.save_report(tuned_results, "results/tuned_thresholds.json")
 ```
 
 For each candidate, selection maximizes mean positive-class F1 across the original validation folds. The original cutoff is always included. Ties retain it if it is optimal, then follow the supplied grid order. A score at or above the cutoff predicts `+1`. The always-negative baseline remains unchanged. Models are not refit, and their scores, ROC-AUC, training losses, and original fitting times remain unchanged.
@@ -399,7 +399,7 @@ Save the results without training again:
 ```python
 report_path = comparison.save_report(
     results,
-    "reports/model_comparison.json",
+    "results/model_comparison.json",
     metadata={
         "dataset": "Describe the development dataset and its row order here",
         "preprocessing": None,  # No learned preprocessing in the finite example.
@@ -407,11 +407,13 @@ report_path = comparison.save_report(
 )
 ```
 
+This saves one JSON file. Experiment metadata and ranked results appear first; the long lists of exact fold indices are at the end. Values retain their full precision.
+
 The JSON contains ranked model configurations, metric means and standard deviations, each fold's metrics/loss/fitting time, total fitting times, and the exact training/validation indices in their original order. OOF arrays remain in memory. Add the actual dataset source/order and preprocessing class/settings to `metadata` for your experiment. All metadata values must be JSON-compatible; NumPy arrays and scalars are supported.
 
 `fold_seed` records the seed used when generating the supplied folds; it does not generate or change them. An unknown seed is saved as `null`. The saved indices allow exact fold reuse with the same development data and row order. Reports use Python's standard JSON format and can be reopened with `json.load`; `report["results"]` also works with `format_comparison_table`.
 
-The output directory is created automatically and an existing report at the same path is replaced. Generated files under `reports/` are gitignored.
+The output directory is created automatically and an existing report at the same path is replaced. Generated files under `results/` are gitignored.
 
 ### Plot a comparison
 
@@ -423,12 +425,12 @@ import matplotlib.pyplot as plt
 from src.reporting.visualization import plot_model_comparison
 
 fig, ax = plot_model_comparison(results)
-Path("reports").mkdir(exist_ok=True)
-fig.savefig("reports/model_comparison_f1.png", dpi=150, bbox_inches="tight")
+Path("results").mkdir(exist_ok=True)
+fig.savefig("results/model_comparison_f1.png", dpi=150, bbox_inches="tight")
 plt.show()
 ```
 
-To plot a saved report without retraining, load it with `json.load` and pass `report["results"]` instead. The function returns the Matplotlib figure and axes for customization; pass `ax=...` to draw on an existing subplot. The plotting helper preserves the results and leaves saving/display to the caller. Save plots as PNG only, keeping one image per chart. Plot files under `reports/` are gitignored.
+To plot a saved report without retraining, load it with `json.load` and pass `report["results"]` instead. The function returns the Matplotlib figure and axes for customization; pass `ax=...` to draw on an existing subplot. The plotting helper preserves the results and leaves saving/display to the caller. Save plots as PNG only, keeping one image per chart. Plot files under `results/` are gitignored.
 
 ### Final evaluation and submission
 
