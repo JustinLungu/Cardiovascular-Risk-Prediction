@@ -105,13 +105,14 @@ def train_model(
 
     X must be preprocessed, finite, and without an intercept column. Labels
     use {-1, +1}. Supported methods are least_squares, mean_squared_error_gd,
-    mean_squared_error_sgd, ridge_regression, logistic_regression, and
-    reg_logistic_regression. Both logistic methods convert labels to {0, 1}.
+    mean_squared_error_sgd, ridge_regression, logistic_regression,
+    reg_logistic_regression, and svm. Both logistic methods convert labels to
+    {0, 1}; SVM keeps {-1, +1} labels.
     Iterative methods start from zero weights and use max_it and gamma; SGD
     preserves the caller's RNG state. Regularized methods use a finite
     nonnegative lmbd and penalize the intercept too. Loss is mean negative
-    log-likelihood for both logistic methods and half-MSE otherwise, excluding
-    any regularization penalty.
+    log-likelihood for both logistic methods, mean hinge loss for SVM, and
+    half-MSE for least squares/ridge, excluding any regularization penalty.
     """
     X_fit = add_intercept(X)
     is_logistic = method in ("logistic_regression", "reg_logistic_regression")
@@ -127,8 +128,8 @@ def train_model(
             "Training features must be finite; complete preprocessing first."
         )
 
-    if method in ("ridge_regression", "reg_logistic_regression"):
-        # Both L2 penalties require a finite, nonnegative strength.
+    if method in ("ridge_regression", "reg_logistic_regression", "svm"):
+        # L2 penalties require a finite, nonnegative strength.
         if not np.isscalar(lmbd) or not np.isfinite(lmbd) or lmbd < 0:
             raise ValueError("lmbd must be a finite, nonnegative scalar.")
 
@@ -146,6 +147,8 @@ def train_model(
         return implementations.reg_logistic_regression(
             y_fit, X_fit, lmbd, w0, max_it, gamma
         )
+    if method == "svm":
+        return implementations.svm(y_fit, X_fit, lmbd, w0, max_it, gamma)
     if method == "mean_squared_error_sgd":
         # The course SGD uses NumPy's global RNG; restore it after the seeded call.
         previous_state = np.random.get_state()

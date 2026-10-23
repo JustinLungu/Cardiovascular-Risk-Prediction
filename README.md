@@ -163,9 +163,9 @@ Use the helpers in `src/training.py` to keep model conventions consistent:
 
 ### Training models
 
-`train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1)` in `src/training.py` calls the existing functions in `implementations.py`. Choose `least_squares`, `mean_squared_error_gd`, or `mean_squared_error_sgd` for three ways to fit the same least-squares model, `ridge_regression` for its L2-regularized version, `logistic_regression` for logistic classification, or `reg_logistic_regression` for logistic classification with L2 regularization.
+`train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1)` in `src/training.py` calls the existing functions in `implementations.py`. Choose `least_squares`, `mean_squared_error_gd`, or `mean_squared_error_sgd` for three ways to fit the same least-squares model, `ridge_regression` for its L2-regularized version, `logistic_regression` for logistic classification, `reg_logistic_regression` for logistic classification with L2 regularization, or `svm` for linear support vector classification.
 
-Pass preprocessed, finite features **without** an intercept column and the original `{-1, +1}` labels. The helper adds the intercept and prepares a separate label array. It returns `(w, loss)`: final training half-MSE for least squares/ridge, or mean negative log-likelihood for both logistic variants. Returned losses exclude regularization penalties. Use `evaluate(...)` for classification metrics. Closed-form least squares requires linearly independent columns after adding the intercept; a singular matrix raises NumPy's `LinAlgError`.
+Pass preprocessed, finite features **without** an intercept column and the original `{-1, +1}` labels. The helper adds the intercept and prepares a separate label array. It returns `(w, loss)`: final training half-MSE for least squares/ridge, mean negative log-likelihood for both logistic variants, or mean hinge loss for SVM. Returned losses exclude regularization penalties. Use `evaluate(...)` for classification metrics. Closed-form least squares requires linearly independent columns after adding the intercept; a singular matrix raises NumPy's `LinAlgError`.
 
 Iterative methods start from zero weights and use `max_it` updates with learning rate `gamma`. SGD uses `seed` for each call and restores the previous NumPy random state afterward. Select iteration counts and learning rates using development validation results.
 
@@ -194,6 +194,8 @@ validation_metrics = evaluate(y_val, y_pred, probabilities)
 ```
 
 For regularized logistic regression, call `train_model(X_train, y_train, method="reg_logistic_regression", lmbd=0.1)`. The finite, nonnegative `lmbd` controls the L2 penalty on all weights, including the intercept. Setting it to `0.0` matches ordinary logistic regression with the same iteration count and learning rate. Select `lmbd` using development validation results.
+
+For linear SVM, call `train_model(X_train, y_train, method="svm", lmbd=0.1)`. It keeps `{-1, +1}` training labels and uses gradient descent on mean hinge loss plus `(lmbd / 2) * ||w||²`, including the intercept in the penalty. The strength must be finite and nonnegative. Use `predict_from_weights(X_val, w)` to obtain class predictions at threshold `0.0` and continuous decision scores for ROC-AUC. These scores can be negative or greater than `1`. Select `lmbd`, `max_it`, and `gamma` using development validation results.
 
 ### Always-negative baseline
 
