@@ -11,9 +11,16 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 
+# Local verification tests
+/tests/
+
+# Generated model comparison reports
+/results/
+
 .vscode/
 .idea/
 .DS_Store
 
 # Local planning notes
 roadmap_notes/
+/roadmap.md
