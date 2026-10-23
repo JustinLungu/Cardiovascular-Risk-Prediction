@@ -1,6 +1,7 @@
 """Compare configured models using the same development-data folds."""
 
 from src.cross_validation import CrossValidator
+from src.evaluation import ModelEvaluator
 from src.reporting import save_comparison_report
 
 
@@ -21,6 +22,32 @@ class ModelComparison:
         self.folds = list(folds)
         self.preprocessor_factory = preprocessor_factory
         self.fold_seed = fold_seed
+
+    @classmethod
+    def from_configurations(
+        cls, configurations, folds, preprocessor_factory=None, fold_seed=None
+    ):
+        """Build a comparison from method names mapped to lists of settings.
+
+        Each settings dictionary contains ModelEvaluator keyword arguments,
+        such as lmbd, gamma, max_it, or seed. Use [{}] to evaluate defaults.
+        Every entry becomes a separate candidate, including repeated settings.
+        This only constructs evaluators; call run(X, y) to evaluate them using
+        the shared development folds and fresh preprocessing as usual.
+        """
+        candidates = {}
+        for method, parameter_sets in configurations.items():
+            parameter_sets = list(parameter_sets)
+            if not parameter_sets:
+                raise ValueError(f"Provide at least one configuration for {method}.")
+            for index, params in enumerate(parameter_sets, start=1):
+                settings = ", ".join(f"{key}={value}" for key, value in params.items())
+                # The index retains every entry even when settings/labels repeat.
+                name = f"{method} [{index}]"
+                if settings:
+                    name += f" ({settings})"
+                candidates[name] = ModelEvaluator(method, **params)
+        return cls(candidates, folds, preprocessor_factory, fold_seed)
 
     def run(self, X, y):
         """Return full CV results by candidate name, ranked by mean positive F1.

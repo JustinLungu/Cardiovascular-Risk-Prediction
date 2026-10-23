@@ -304,6 +304,36 @@ For learned preprocessing, pass `preprocessor_factory` to `ModelComparison` usin
 
 The table shows F1, precision, recall, accuracy, and ROC-AUC as `mean ± std` to four decimal places. Ranking uses full-precision mean F1; ties keep the original candidate order. Complete summaries, fold results, and OOF arrays remain accessible by candidate name. The example settings demonstrate the API; select the actual model settings using development validation results.
 
+### Compare hyperparameter configurations
+
+Use `ModelComparison.from_configurations` to evaluate small, explicit lists of settings for each method. It creates the named evaluators for the existing comparison runner. Each dictionary is one complete combination to try; omitted arguments use the training helper's defaults, and `[{}]` evaluates a method with defaults. This finite-feature example reuses the same development folds:
+
+```python
+configurations = {
+    "always_negative_baseline": [{}],
+    "ridge_regression": [
+        {"lmbd": 0.001},
+        {"lmbd": 0.01},
+        {"lmbd": 0.1},
+    ],
+    "logistic_regression": [
+        {"max_it": 1000, "gamma": 0.01},
+        {"max_it": 5000, "gamma": 0.01},
+        {"max_it": 5000, "gamma": 0.05},
+    ],
+}
+comparison = ModelComparison.from_configurations(configurations, folds, fold_seed=42)
+results = comparison.run(X_dev, y_dev)
+print(format_comparison_table(results))
+
+best_name = next(iter(results))  # Results are ranked by mean validation F1.
+best_config = results[best_name]["configuration"]
+```
+
+Pass `preprocessor_factory` when learned preprocessing is needed, following the training-only fit rules above. Every configuration uses the same folds and gets fresh preprocessing for each fold. Candidate names include the method, a per-method index, and the supplied settings. Every requested entry is retained, including duplicate settings, with complete effective configuration snapshots, fold metrics, fitting times, and OOF arrays. An empty configuration list raises an error.
+
+The existing report and plot helpers accept these results directly. Select small candidate lists using development data and keep each result for review; the example values are starting choices for demonstrating the API. The example uses default classification thresholds. Threshold selection using OOF scores follows separately, and the reserved local test set stays untouched during selection.
+
 ### Save a comparison report
 
 Each comparison result also contains a `configuration` snapshot and `training_time_seconds`, the sum of fitting times across its folds. The configuration records the method, effective threshold, and shared training-helper defaults with any explicit overrides. Defaults such as the SGD seed are therefore recorded even when omitted by the caller. Some helper settings apply only to particular methods; the baseline has no training parameters or threshold. Changing an evaluator's settings after a run preserves the configuration already recorded with that run.
