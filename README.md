@@ -428,7 +428,7 @@ fig.savefig("reports/model_comparison_f1.png", dpi=150, bbox_inches="tight")
 plt.show()
 ```
 
-To plot a saved report without retraining, load it with `json.load` and pass `report["results"]` instead. The function returns the Matplotlib figure and axes for customization; pass `ax=...` to draw on an existing subplot. The plotting helper preserves the results and leaves saving/display to the caller. Plot files under `reports/` are gitignored.
+To plot a saved report without retraining, load it with `json.load` and pass `report["results"]` instead. The function returns the Matplotlib figure and axes for customization; pass `ax=...` to draw on an existing subplot. The plotting helper preserves the results and leaves saving/display to the caller. Save plots as PNG only, keeping one image per chart. Plot files under `reports/` are gitignored.
 
 ### Final evaluation and submission
 
