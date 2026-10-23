@@ -105,15 +105,17 @@ def train_model(
 
     X must be preprocessed, finite, and without an intercept column. Labels
     use {-1, +1}. Supported methods are least_squares, mean_squared_error_gd,
-    mean_squared_error_sgd, ridge_regression, and logistic_regression. Logistic
-    training converts labels to {0, 1} internally. Iterative methods start from
-    zero weights and use max_it and gamma; SGD preserves the caller's RNG state.
-    Ridge uses a finite nonnegative lmbd, including for the intercept. Loss is
-    mean negative log-likelihood for logistic regression and half-MSE otherwise,
-    excluding any regularization penalty.
+    mean_squared_error_sgd, ridge_regression, logistic_regression, and
+    reg_logistic_regression. Both logistic methods convert labels to {0, 1}.
+    Iterative methods start from zero weights and use max_it and gamma; SGD
+    preserves the caller's RNG state. Regularized methods use a finite
+    nonnegative lmbd and penalize the intercept too. Loss is mean negative
+    log-likelihood for both logistic methods and half-MSE otherwise, excluding
+    any regularization penalty.
     """
     X_fit = add_intercept(X)
-    y_fit = prepare_training_labels(y, logistic=method == "logistic_regression")
+    is_logistic = method in ("logistic_regression", "reg_logistic_regression")
+    y_fit = prepare_training_labels(y, logistic=is_logistic)
     # Training needs at least one row, with a label for every feature row.
     if len(y_fit) == 0 or len(X_fit) != len(y_fit):
         raise ValueError(
@@ -125,12 +127,14 @@ def train_model(
             "Training features must be finite; complete preprocessing first."
         )
 
+    if method in ("ridge_regression", "reg_logistic_regression"):
+        # Both L2 penalties require a finite, nonnegative strength.
+        if not np.isscalar(lmbd) or not np.isfinite(lmbd) or lmbd < 0:
+            raise ValueError("lmbd must be a finite, nonnegative scalar.")
+
     if method == "least_squares":
         return implementations.least_squares(y_fit, X_fit)
     if method == "ridge_regression":
-        # The ridge penalty requires a finite, nonnegative strength.
-        if not np.isscalar(lmbd) or not np.isfinite(lmbd) or lmbd < 0:
-            raise ValueError("lmbd must be a finite, nonnegative scalar.")
         return implementations.ridge_regression(y_fit, X_fit, lmbd)
 
     w0 = np.zeros(X_fit.shape[1])
@@ -138,6 +142,10 @@ def train_model(
         return implementations.mean_squared_error_gd(y_fit, X_fit, w0, max_it, gamma)
     if method == "logistic_regression":
         return implementations.logistic_regression(y_fit, X_fit, w0, max_it, gamma)
+    if method == "reg_logistic_regression":
+        return implementations.reg_logistic_regression(
+            y_fit, X_fit, lmbd, w0, max_it, gamma
+        )
     if method == "mean_squared_error_sgd":
         # The course SGD uses NumPy's global RNG; restore it after the seeded call.
         previous_state = np.random.get_state()

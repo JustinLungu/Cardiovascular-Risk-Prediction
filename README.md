@@ -163,9 +163,9 @@ Use the helpers in `src/training.py` to keep model conventions consistent:
 
 ### Training models
 
-`train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1)` in `src/training.py` calls the existing functions in `implementations.py`. Choose `least_squares`, `mean_squared_error_gd`, or `mean_squared_error_sgd` for three ways to fit the same least-squares model, `ridge_regression` for its L2-regularized version, or `logistic_regression` for logistic classification.
+`train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1)` in `src/training.py` calls the existing functions in `implementations.py`. Choose `least_squares`, `mean_squared_error_gd`, or `mean_squared_error_sgd` for three ways to fit the same least-squares model, `ridge_regression` for its L2-regularized version, `logistic_regression` for logistic classification, or `reg_logistic_regression` for logistic classification with L2 regularization.
 
-Pass preprocessed, finite features **without** an intercept column and the original `{-1, +1}` labels. The helper adds the intercept and prepares a separate label array. It returns `(w, loss)`: final training half-MSE for least squares/ridge, or mean negative log-likelihood for logistic regression. Use `evaluate(...)` for classification metrics. Closed-form least squares requires linearly independent columns after adding the intercept; a singular matrix raises NumPy's `LinAlgError`.
+Pass preprocessed, finite features **without** an intercept column and the original `{-1, +1}` labels. The helper adds the intercept and prepares a separate label array. It returns `(w, loss)`: final training half-MSE for least squares/ridge, or mean negative log-likelihood for both logistic variants. Returned losses exclude regularization penalties. Use `evaluate(...)` for classification metrics. Closed-form least squares requires linearly independent columns after adding the intercept; a singular matrix raises NumPy's `LinAlgError`.
 
 Iterative methods start from zero weights and use `max_it` updates with learning rate `gamma`. SGD uses `seed` for each call and restores the previous NumPy random state afterward. Select iteration counts and learning rates using development validation results.
 
@@ -183,7 +183,7 @@ y_pred, y_score = predict_from_weights(X_val, w)
 validation_metrics = evaluate(y_val, y_pred, y_score)
 ```
 
-For `method="logistic_regression"`, the training helper converts a copy of the labels to `{0, 1}`. Use `logistic=True` when predicting from its weights to obtain positive-class probabilities and apply the default `0.5` threshold. Keep the original `{-1, +1}` labels for evaluation:
+For `method="logistic_regression"` or `method="reg_logistic_regression"`, the training helper converts a copy of the labels to `{0, 1}`. Use `logistic=True` when predicting from its weights to obtain positive-class probabilities and apply the default `0.5` threshold. Keep the original `{-1, +1}` labels for evaluation:
 
 ```python
 w, training_loss = train_model(
@@ -192,6 +192,8 @@ w, training_loss = train_model(
 y_pred, probabilities = predict_from_weights(X_val, w, logistic=True)
 validation_metrics = evaluate(y_val, y_pred, probabilities)
 ```
+
+For regularized logistic regression, call `train_model(X_train, y_train, method="reg_logistic_regression", lmbd=0.1)`. The finite, nonnegative `lmbd` controls the L2 penalty on all weights, including the intercept. Setting it to `0.0` matches ordinary logistic regression with the same iteration count and learning rate. Select `lmbd` using development validation results.
 
 ### Always-negative baseline
 
