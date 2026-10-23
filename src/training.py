@@ -98,14 +98,17 @@ def predict_from_weights(X, w, logistic=False, threshold=None):
     return y_pred, y_score
 
 
-def train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42):
-    """Train a least-squares variant and return the course function's (w, loss).
+def train_model(
+    X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1
+):
+    """Train a least-squares or ridge model and return the course (w, loss).
 
     X must be preprocessed, finite, and without an intercept column. Labels
     use {-1, +1}. Supported methods are least_squares, mean_squared_error_gd,
-    and mean_squared_error_sgd. GD/SGD start from zero weights and use max_it
-    and gamma; SGD is seeded per call without changing the caller's RNG state.
-    The returned training loss is half the mean squared error.
+    mean_squared_error_sgd, and ridge_regression. GD/SGD start from zero weights
+    and use max_it and gamma; SGD is seeded without changing the caller's RNG
+    state. Ridge uses a finite nonnegative lmbd, including for the intercept.
+    The returned loss is half-MSE, excluding any regularization penalty.
     """
     X_fit = add_intercept(X)
     y_fit = prepare_training_labels(y)
@@ -122,6 +125,11 @@ def train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42):
 
     if method == "least_squares":
         return implementations.least_squares(y_fit, X_fit)
+    if method == "ridge_regression":
+        # The ridge penalty requires a finite, nonnegative strength.
+        if not np.isscalar(lmbd) or not np.isfinite(lmbd) or lmbd < 0:
+            raise ValueError("lmbd must be a finite, nonnegative scalar.")
+        return implementations.ridge_regression(y_fit, X_fit, lmbd)
 
     w0 = np.zeros(X_fit.shape[1])
     if method == "mean_squared_error_gd":
