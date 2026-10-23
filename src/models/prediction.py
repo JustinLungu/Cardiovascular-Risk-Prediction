@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from src.model_inputs import add_intercept
+from src.models.model_inputs import add_intercept
 
 
 def always_negative_baseline(X):

@@ -64,21 +64,46 @@ bash scripts/prepare_data.sh
 
 ## Code structure
 
-`implementations.py` and `run.py` stay at the repository root because the course grading tests expect them there. The former contains the six required ML methods; the latter is a thin entry point for reproducing predictions. Other reusable code lives in `src/`, with data preparation in `src/data_prep/` and exploration in `src/data_exploration/`.
+`implementations.py` and `run.py` stay at the repository root because the course grading tests expect them there. The former contains the six required ML methods; the latter is a thin entry point for reproducing predictions. Reusable code is grouped by responsibility under `src/`:
+
+```text
+src/
+├── data_prep/                 # Dataset loading, preparation, and splitting
+│   ├── download_data.py
+│   ├── extract_data.py
+│   ├── data_loading.py
+│   ├── preprocessing.py
+│   └── train_test_split.py
+├── models/                    # Adapters for the course model implementations
+│   ├── model_inputs.py
+│   ├── training.py
+│   └── prediction.py
+├── evaluation/                # Validation, scoring, and model selection
+│   ├── metrics.py
+│   ├── evaluator.py
+│   ├── cross_validation.py
+│   ├── model_comparison.py
+│   └── threshold_tuning.py
+└── reporting/                 # Saved results and plots
+    ├── comparison_report.py
+    └── visualization.py
+```
+
+Import helpers from their modules, for example `from src.models.training import train_model`. Run module commands from the repository root; the splitter is now `uv run python -m src.data_prep.train_test_split`. Its saved CSVs still go to `data/train_test_split/` by default.
 
 | Module | Responsibility |
 | --- | --- |
-| `src/train_test_split.py` | `TrainTestSplit` and development/holdout preparation. |
-| `src/cross_validation.py` | Shared stratified folds, the `CrossValidator` runner, and metric summaries. |
-| `src/model_inputs.py` | Intercept columns and training-label conversion. |
-| `src/training.py` | Fit the existing course models. |
-| `src/prediction.py` | Class predictions, continuous scores, and the baseline. |
-| `src/metrics.py` | Classification metric calculations. |
-| `src/evaluation.py` | `ModelEvaluator`: model settings and one-fold evaluation. |
-| `src/model_comparison.py` | `ModelComparison`: evaluate named candidates on shared folds and format their ranked results. |
-| `src/reporting.py` | Save comparison settings, exact folds, metrics, and fitting times as JSON. |
-| `src/visualization.py` | Plot mean validation F1 with fold standard deviation error bars. |
-| `src/threshold_tuning.py` | Select thresholds from development OOF scores while retaining the original results. |
+| `src/data_prep/train_test_split.py` | `TrainTestSplit` and development/holdout preparation. |
+| `src/evaluation/cross_validation.py` | Shared stratified folds, the `CrossValidator` runner, and metric summaries. |
+| `src/models/model_inputs.py` | Intercept columns and training-label conversion. |
+| `src/models/training.py` | Fit the existing course models. |
+| `src/models/prediction.py` | Class predictions, continuous scores, and the baseline. |
+| `src/evaluation/metrics.py` | Classification metric calculations. |
+| `src/evaluation/evaluator.py` | `ModelEvaluator`: model settings and one-fold evaluation. |
+| `src/evaluation/model_comparison.py` | `ModelComparison`: evaluate named candidates on shared folds and format their ranked results. |
+| `src/reporting/comparison_report.py` | Save comparison settings, exact folds, metrics, and fitting times as JSON. |
+| `src/reporting/visualization.py` | Plot mean validation F1 with fold standard deviation error bars. |
+| `src/evaluation/threshold_tuning.py` | Select thresholds from development OOF scores while retaining the original results. |
 
 Exploratory notebooks live in `notebooks/`, starting with [exploration.ipynb](notebooks/exploration.ipynb). When opening a notebook in your editor, select the Python kernel from the project's `.venv` environment.
 
@@ -88,7 +113,7 @@ The NumPy model comparison workflow is being implemented on `feat/model-comparis
 
 ### Development data and final test set
 
-Reuse the existing stratified 60/20/20 partitions from `src/train_test_split.py`. Combine training and validation into development data and preserve the existing test partition.
+Reuse the existing stratified 60/20/20 partitions from `src/data_prep/train_test_split.py`. Combine training and validation into development data and preserve the existing test partition.
 
 | Dataset | Share of labeled rows | Purpose |
 | --- | --- | --- |
@@ -101,7 +126,7 @@ Reuse the existing stratified 60/20/20 partitions from `src/train_test_split.py`
 For an already-loaded split dictionary returned by `TrainTestSplit`, prepare the two datasets with:
 
 ```python
-from src.train_test_split import prepare_development_and_holdout
+from src.data_prep.train_test_split import prepare_development_and_holdout
 
 development, holdout = prepare_development_and_holdout(parts)
 X_dev, y_dev = development["X"], development["y"]
@@ -117,7 +142,7 @@ Use five-fold stratified cross-validation within development data. Generate the 
 Generate the folds from development labels only:
 
 ```python
-from src.cross_validation import stratified_k_fold
+from src.evaluation.cross_validation import stratified_k_fold
 
 folds = stratified_k_fold(development["y"], k=5, seed=42)
 for training_rows, validation_rows in folds:
@@ -135,7 +160,7 @@ Control training randomness as well as fold generation, including the sampling u
 
 The positive class is `+1`. Evaluation labels and class predictions use `{-1, +1}`. Convert training labels to `{0, 1}` when fitting logistic regression, then map its class predictions back for evaluation. Use continuous probabilities or decision scores when calculating ROC-AUC.
 
-`confusion_counts(y_true, y_pred)` in `src/metrics.py` returns integer counts under the keys `tp`, `tn`, `fp`, and `fn`: correctly predicted positives, correctly predicted negatives, false alarms, and missed positives. It accepts matching 1D arrays of `{-1, +1}` labels, with zero counts for empty inputs. Prediction scores must be converted to class labels before calling it.
+`confusion_counts(y_true, y_pred)` in `src/evaluation/metrics.py` returns integer counts under the keys `tp`, `tn`, `fp`, and `fn`: correctly predicted positives, correctly predicted negatives, false alarms, and missed positives. It accepts matching 1D arrays of `{-1, +1}` labels, with zero counts for empty inputs. Prediction scores must be converted to class labels before calling it.
 
 `accuracy(y_true, y_pred)`, `precision(y_true, y_pred)`, and `recall(y_true, y_pred)` use the same label inputs. Accuracy is `(tp + tn) / total`, precision is `tp / (tp + fp)`, and recall is `tp / (tp + fn)`. Each returns a fraction between 0 and 1; a zero denominator returns `0.0`, including for empty inputs.
 
@@ -146,7 +171,7 @@ The positive class is `+1`. Evaluation labels and class predictions use `{-1, +1
 `evaluate(y_true, y_pred, y_score)` returns all five metrics in one dictionary with keys `accuracy`, `precision`, `recall`, `f1`, and `roc_auc`. Supply class predictions made using the threshold chosen in the training workflow, plus continuous scores for ROC-AUC. It follows the same input rules and requires both true classes.
 
 ```python
-from src.metrics import evaluate
+from src.evaluation.metrics import evaluate
 
 results = evaluate(
     y_true=[-1, -1, 1, 1],
@@ -162,22 +187,22 @@ Select hyperparameters and prediction thresholds using development cross-validat
 
 ### Model inputs and predictions
 
-Use `src/model_inputs.py` for model inputs and `src/prediction.py` for predictions, with these conventions:
+Use `src/models/model_inputs.py` for model inputs and `src/models/prediction.py` for predictions, with these conventions:
 
 | Models | Training labels | Prediction scores | Default threshold |
 | --- | --- | --- | --- |
 | Least squares (closed form, GD, SGD), ridge, and linear SVM | `{-1, +1}` | Linear decision scores | `0.0` |
 | Logistic and regularized logistic regression | `{0, 1}` | Probability of `+1` | `0.5` |
 
-`prepare_training_labels(y, logistic=False)` in `src/model_inputs.py` accepts the original `{-1, +1}` labels and returns a separate training array. Set `logistic=True` to map `-1` to `0` and keep `+1` as `1`; keep the original labels for evaluation.
+`prepare_training_labels(y, logistic=False)` in `src/models/model_inputs.py` accepts the original `{-1, +1}` labels and returns a separate training array. Set `logistic=True` to map `-1` to `0` and keep `+1` as `1`; keep the original labels for evaluation.
 
 `add_intercept(X)` in the same module prepends one column of ones after preprocessing, giving the models an intercept weight at `w[0]`. Use it once on training features before passing them to a course training function. The existing regularized implementations penalize all weights, including this intercept.
 
-`predict_from_weights(X, w, logistic=False, threshold=None)` in `src/prediction.py` takes preprocessed prediction features **without** an intercept column and adds it internally. It returns `(y_pred, y_score)` with `{-1, +1}` predictions and continuous scores for ROC-AUC. Set `logistic=True` for logistic weights. A custom `threshold` changes class predictions while preserving scores; equality with the threshold predicts `+1`. Select thresholds using development validation results.
+`predict_from_weights(X, w, logistic=False, threshold=None)` in `src/models/prediction.py` takes preprocessed prediction features **without** an intercept column and adds it internally. It returns `(y_pred, y_score)` with `{-1, +1}` predictions and continuous scores for ROC-AUC. Set `logistic=True` for logistic weights. A custom `threshold` changes class predictions while preserving scores; equality with the threshold predicts `+1`. Select thresholds using development validation results.
 
 ### Training models
 
-`train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1)` in `src/training.py` calls the existing functions in `implementations.py`. Choose `least_squares`, `mean_squared_error_gd`, or `mean_squared_error_sgd` for three ways to fit the same least-squares model, `ridge_regression` for its L2-regularized version, `logistic_regression` for logistic classification, `reg_logistic_regression` for logistic classification with L2 regularization, or `svm` for linear support vector classification.
+`train_model(X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1)` in `src/models/training.py` calls the existing functions in `implementations.py`. Choose `least_squares`, `mean_squared_error_gd`, or `mean_squared_error_sgd` for three ways to fit the same least-squares model, `ridge_regression` for its L2-regularized version, `logistic_regression` for logistic classification, `reg_logistic_regression` for logistic classification with L2 regularization, or `svm` for linear support vector classification.
 
 Pass preprocessed, finite features **without** an intercept column and the original `{-1, +1}` labels. The helper adds the intercept and prepares a separate label array. It returns `(w, loss)`: final training half-MSE for least squares/ridge, mean negative log-likelihood for both logistic variants, or mean hinge loss for SVM. Returned losses exclude regularization penalties. Use `evaluate(...)` for classification metrics. Closed-form least squares requires linearly independent columns after adding the intercept; a singular matrix raises NumPy's `LinAlgError`.
 
@@ -186,9 +211,9 @@ Iterative methods start from zero weights and use `max_it` updates with learning
 For ridge, use `train_model(X_train, y_train, method="ridge_regression", lmbd=0.1)`. The strength `lmbd` must be a finite, nonnegative scalar; larger values apply stronger shrinkage. Setting it to `0.0` matches least squares when the design matrix has full column rank. A positive strength also makes collinear columns solvable. The returned training half-MSE excludes the regularization penalty. Select `lmbd` using development validation results.
 
 ```python
-from src.training import train_model
-from src.prediction import predict_from_weights
-from src.metrics import evaluate
+from src.models.training import train_model
+from src.models.prediction import predict_from_weights
+from src.evaluation.metrics import evaluate
 
 w, training_loss = train_model(
     X_train, y_train, method="mean_squared_error_sgd",
@@ -214,11 +239,11 @@ For linear SVM, call `train_model(X_train, y_train, method="svm", lmbd=0.1)`. It
 
 ### Always-negative baseline
 
-`always_negative_baseline(X)` in `src/prediction.py` returns `(y_pred, y_score)`, predicting `-1` for every feature row with constant decision scores of `-1.0`. It needs no fitting or preprocessing. With both classes present, precision, recall, and F1 are `0.0`, ROC-AUC is `0.5`, and accuracy equals the share of negative labels. This reference shows how much accuracy can come from class imbalance alone.
+`always_negative_baseline(X)` in `src/models/prediction.py` returns `(y_pred, y_score)`, predicting `-1` for every feature row with constant decision scores of `-1.0`. It needs no fitting or preprocessing. With both classes present, precision, recall, and F1 are `0.0`, ROC-AUC is `0.5`, and accuracy equals the share of negative labels. This reference shows how much accuracy can come from class imbalance alone.
 
 ```python
-from src.prediction import always_negative_baseline
-from src.metrics import evaluate
+from src.models.prediction import always_negative_baseline
+from src.evaluation.metrics import evaluate
 
 y_pred, y_score = always_negative_baseline(X_val)
 baseline_metrics = evaluate(y_val, y_pred, y_score)
@@ -226,14 +251,14 @@ baseline_metrics = evaluate(y_val, y_pred, y_score)
 
 ### Evaluate one validation fold
 
-`ModelEvaluator` in `src/evaluation.py` keeps the model method, threshold, and training parameters together. Configure it once, then call `evaluator.evaluate_fold(X_train, y_train, X_val, y_val, ...)` on the development rows selected by `stratified_k_fold`. The evaluator combines preprocessing, training, prediction, and metrics. Settings such as `lmbd`, `max_it`, `gamma`, and `seed` are forwarded to `train_model` on each call.
+`ModelEvaluator` in `src/evaluation/evaluator.py` keeps the model method, threshold, and training parameters together. Configure it once, then call `evaluator.evaluate_fold(X_train, y_train, X_val, y_val, ...)` on the development rows selected by `stratified_k_fold`. The evaluator combines preprocessing, training, prediction, and metrics. Settings such as `lmbd`, `max_it`, `gamma`, and `seed` are forwarded to `train_model` on each call.
 
 For learned preprocessing, pass a fresh instance as `preprocessor` to each `evaluate_fold` call. It must provide `fit(X_train, y_train)` and `transform(X)`: fitting receives only training features and their original `{-1, +1}` labels, then transformation runs on training and validation separately. Transformations must preserve row counts/order and produce the same feature columns for both portions, without an intercept column. The evaluator copies input arrays before preprocessing so operations in place preserve the caller's raw data.
 
 The production preprocessing module is still a placeholder. Use `preprocessor=None` only when no learned preprocessing is needed, as in this finite synthetic example:
 
 ```python
-from src.evaluation import ModelEvaluator
+from src.evaluation.evaluator import ModelEvaluator
 
 evaluator = ModelEvaluator(method="ridge_regression", lmbd=0.1)
 fold_result = evaluator.evaluate_fold(
@@ -247,11 +272,11 @@ The result contains `metrics`, `training_loss`, `training_time_seconds`, `y_pred
 
 ### Evaluate all development folds
 
-`CrossValidator` in `src/cross_validation.py` repeats one configured evaluator across the shared folds. Generate the folds once and reuse them for every candidate. This example assumes finite features that need no learned preprocessing:
+`CrossValidator` in `src/evaluation/cross_validation.py` repeats one configured evaluator across the shared folds. Generate the folds once and reuse them for every candidate. This example assumes finite features that need no learned preprocessing:
 
 ```python
-from src.cross_validation import CrossValidator, stratified_k_fold
-from src.evaluation import ModelEvaluator
+from src.evaluation.cross_validation import CrossValidator, stratified_k_fold
+from src.evaluation.evaluator import ModelEvaluator
 
 folds = stratified_k_fold(y_dev, k=5, seed=42)
 evaluator = ModelEvaluator(method="ridge_regression", lmbd=0.1)
@@ -269,15 +294,15 @@ For learned preprocessing, pass `preprocessor_factory` to `CrossValidator`: a ca
 
 `summary` reports `{"mean": ..., "std": ...}` for accuracy, precision, recall, F1, and ROC-AUC. Each fold counts equally, including when rounding produces slightly different validation sizes. Standard deviation uses `ddof=0` and describes how much the observed fold scores vary; it is not a confidence interval. For example, F1 values of `0.6` and `0.8` have mean `0.7` and standard deviation `0.1`. These statistics summarize the individual fold metrics; calculating a metric once over all OOF predictions can give a different result. Training loss stays in each fold result because different model families use different loss functions.
 
-To summarize existing fold results without training again, call `summarize_fold_results(cv_result["fold_results"])` from `src/cross_validation.py`.
+To summarize existing fold results without training again, call `summarize_fold_results(cv_result["fold_results"])` from `src/evaluation/cross_validation.py`.
 
 ### Compare model candidates
 
-`ModelComparison` in `src/model_comparison.py` runs named `ModelEvaluator` instances on the same development folds and returns their complete CV results ranked by mean positive-class F1. Pass the shared folds generated above. For finite features that need no learned preprocessing:
+`ModelComparison` in `src/evaluation/model_comparison.py` runs named `ModelEvaluator` instances on the same development folds and returns their complete CV results ranked by mean positive-class F1. Pass the shared folds generated above. For finite features that need no learned preprocessing:
 
 ```python
-from src.evaluation import ModelEvaluator
-from src.model_comparison import ModelComparison, format_comparison_table
+from src.evaluation.evaluator import ModelEvaluator
+from src.evaluation.model_comparison import ModelComparison, format_comparison_table
 
 candidates = {
     "Baseline": ModelEvaluator("always_negative_baseline"),
@@ -337,10 +362,10 @@ The existing report and plot helpers accept these results directly. Select small
 
 ### Select classification thresholds
 
-`ThresholdTuner` in `src/threshold_tuning.py` tries explicit threshold grids against the existing OOF scores. Supply the same folds and development labels used for model comparison. A grid is required for each trained method; configurations of that method share the grid. Logistic scores are probabilities, while ridge, MSE, and SVM use raw decision scores, so choose grids in their respective score units. For the methods in the hyperparameter example:
+`ThresholdTuner` in `src/evaluation/threshold_tuning.py` tries explicit threshold grids against the existing OOF scores. Supply the same folds and development labels used for model comparison. A grid is required for each trained method; configurations of that method share the grid. Logistic scores are probabilities, while ridge, MSE, and SVM use raw decision scores, so choose grids in their respective score units. For the methods in the hyperparameter example:
 
 ```python
-from src.threshold_tuning import ThresholdTuner
+from src.evaluation.threshold_tuning import ThresholdTuner
 
 default_results = results
 tuner = ThresholdTuner(
@@ -390,12 +415,12 @@ The output directory is created automatically and an existing report at the same
 
 ### Plot a comparison
 
-`plot_model_comparison` in `src/visualization.py` draws a horizontal F1 chart using the existing metric summaries. It keeps the comparison order, with the highest-ranked candidate at the top. Error bars show one population standard deviation across folds (`ddof=0`), describing fold variation rather than a confidence interval. The axis includes the full error bars, even when mean ± standard deviation extends beyond the 0–1 score range.
+`plot_model_comparison` in `src/reporting/visualization.py` draws a horizontal F1 chart using the existing metric summaries. It keeps the comparison order, with the highest-ranked candidate at the top. Error bars show one population standard deviation across folds (`ddof=0`), describing fold variation rather than a confidence interval. The axis includes the full error bars, even when mean ± standard deviation extends beyond the 0–1 score range.
 
 ```python
 from pathlib import Path
 import matplotlib.pyplot as plt
-from src.visualization import plot_model_comparison
+from src.reporting.visualization import plot_model_comparison
 
 fig, ax = plot_model_comparison(results)
 Path("reports").mkdir(exist_ok=True)

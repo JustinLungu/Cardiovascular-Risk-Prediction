@@ -4,9 +4,9 @@ from copy import deepcopy
 
 import numpy as np
 
-from src.cross_validation import summarize_fold_results
-from src.metrics import evaluate, f1_score
-from src.model_inputs import prepare_training_labels
+from src.evaluation.cross_validation import summarize_fold_results
+from src.evaluation.metrics import evaluate, f1_score
+from src.models.model_inputs import prepare_training_labels
 
 
 class ThresholdTuner:

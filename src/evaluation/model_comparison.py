@@ -1,8 +1,8 @@
 """Compare configured models using the same development-data folds."""
 
-from src.cross_validation import CrossValidator
-from src.evaluation import ModelEvaluator
-from src.reporting import save_comparison_report
+from src.evaluation.cross_validation import CrossValidator
+from src.evaluation.evaluator import ModelEvaluator
+from src.reporting.comparison_report import save_comparison_report
 
 
 class ModelComparison:

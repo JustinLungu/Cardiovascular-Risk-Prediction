@@ -10,10 +10,10 @@ from time import perf_counter
 
 import numpy as np
 
-from src.metrics import evaluate
-from src.model_inputs import prepare_training_labels
-from src.prediction import always_negative_baseline, predict_from_weights
-from src.training import train_model
+from src.evaluation.metrics import evaluate
+from src.models.model_inputs import prepare_training_labels
+from src.models.prediction import always_negative_baseline, predict_from_weights
+from src.models.training import train_model
 
 
 class ModelEvaluator:

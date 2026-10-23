@@ -5,7 +5,7 @@
 import numpy as np
 
 import implementations
-from src.model_inputs import add_intercept, prepare_training_labels
+from src.models.model_inputs import add_intercept, prepare_training_labels
 
 
 def train_model(
