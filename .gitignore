@@ -5,6 +5,8 @@
 data/*
 !data/Readme.md
 !data/README.md
+!data/exploration.ipynb
+
 
 .venv/
 __pycache__/
