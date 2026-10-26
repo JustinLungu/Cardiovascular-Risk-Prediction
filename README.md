@@ -165,6 +165,7 @@ comparison = ModelComparison(candidates, folds, fold_seed=42,
                              preprocessor_factory=factory)
 results = comparison.run(X_dev, y_dev)
 print(format_comparison_table(results))
+```
 
 Each fold fits imputation, scaling, and one-hot categories on its training
 rows only, then applies the same fitted parameters and feature order to its
