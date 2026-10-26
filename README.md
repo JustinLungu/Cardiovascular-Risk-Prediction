@@ -95,6 +95,7 @@ src/
 Import helpers from their modules, for example `from src.models.training import train_model`. Run module commands from the repository root; the splitter is now `uv run python -m src.data_prep.train_test_split`. Its saved CSVs still go to `data/train_test_split/` by default.
 
 | Module | Responsibility |
+|---|---|
 | `src/data_prep/preprocessing.py` | Learned imputation, scaling, one-hot encoding, and column-wise composition (`MedianImp`, `ConstantImp`, `StandardScaler`, `OHE`, `ColumnTransformer`, `Pipeline`, `preproc_MSCOHE`) |
 | `src/data_prep/train_test_split.py` | `TrainTestSplit` and development/holdout preparation. |
 | `src/evaluation/cross_validation.py` | Shared stratified folds, the `CrossValidator` runner, and metric summaries. |
