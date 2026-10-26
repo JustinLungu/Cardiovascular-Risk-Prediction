@@ -95,7 +95,7 @@ src/
 Import helpers from their modules, for example `from src.models.training import train_model`. Run module commands from the repository root; the splitter is now `uv run python -m src.data_prep.train_test_split`. Its saved CSVs still go to `data/train_test_split/` by default.
 
 | Module | Responsibility |
-| --- | --- |
+| `src/data_prep/preprocessing.py` | Learned imputation, scaling, one-hot encoding, and column-wise composition (`MedianImp`, `ConstantImp`, `StandardScaler`, `OHE`, `ColumnTransformer`, `Pipeline`, `preproc_MSCOHE`) |
 | `src/data_prep/train_test_split.py` | `TrainTestSplit` and development/holdout preparation. |
 | `src/evaluation/cross_validation.py` | Shared stratified folds, the `CrossValidator` runner, and metric summaries. |
 | `src/models/model_inputs.py` | Intercept columns and training-label conversion. |
@@ -112,6 +112,94 @@ Import helpers from their modules, for example `from src.models.training import 
 | `src/evaluation/threshold_tuning.py` | Select thresholds from development OOF scores while retaining the original results. |
 
 Exploratory notebooks live in `notebooks/`, starting with [exploration.ipynb](notebooks/exploration.ipynb). When opening a notebook in your editor, select the Python kernel from the project's `.venv` environment.
+
+## Preprocessing
+
+`src/data_prep/preprocessing.py` implements the learned preprocessing used by
+every model comparison, threshold tuning, and holdout evaluation. It follows
+the fit-on-training-rows / transform-other-rows contract expected by
+`ModelEvaluator`, `CrossValidator`, `ModelComparison`, and `HoldoutEvaluator`:
+each transformer exposes `fit(X)`, `transform(X)`, and `fit_transform(X)`,
+and `ColumnTransformer` and `Pipeline` compose them without leaking
+validation information into the fit.
+
+Available transformers:
+
+| Class | Role |
+|---|---|
+| `MedianImp` | Replace NaN by the training-column median; columns that are entirely NaN are filled with 0.0. |
+| `ConstantImp` | Replace NaN by a fixed constant (default `-1.0`). |
+| `StandardScaler` | Center and scale each column using training mean and standard deviation; zero-variance columns keep a divisor of 1.0. |
+| `OHE` | One-hot encode categorical columns; optionally drop the first category per column to avoid collinearity; unknown categories at transform time are encoded as all zeros. |
+| `ColumnTransformer` | Apply one transformer per column group and concatenate the outputs; columns not listed are dropped. |
+| `Pipeline` | Chain transformers; every step except the last is fit-transformed, the last is fit on the resulting features. |
+| `preproc_MSCOHE` | Ready-made pipeline: median imputation + standard scaling for numeric columns, constant imputation + one-hot encoding for categorical columns. |
+
+Column indices are passed at construction time, so raw CSVs are never
+modified: `preproc_MSCOHE(num_inputs, cat_inputs)` expects the numeric and
+categorical column positions identified during exploration.
+
+### Fitting across cross-validation folds
+
+Fitting stays inside each fold. Pass a **constructor** (not an instance) as
+`preprocessor_factory` so every fold receives a fresh, unfitted preprocessor:
+
+```python
+from src.data_prep.preprocessing import preproc_MSCOHE
+from src.evaluation.evaluator import ModelEvaluator
+from src.evaluation.model_comparison import ModelComparison, format_comparison_table
+from src.evaluation.cross_validation import stratified_k_fold
+
+folds = stratified_k_fold(y_dev, k=5, seed=42)
+
+factory = lambda: preproc_MSCOHE(num_inputs=NUM_COLS, cat_inputs=CAT_COLS)
+
+candidates = {
+    "Ridge": ModelEvaluator("ridge_regression", lmbd=0.1),
+    "Logistic": ModelEvaluator("logistic_regression", max_it=1000, gamma=0.01),
+    "Regularized logistic": ModelEvaluator(
+        "reg_logistic_regression", lmbd=0.1, max_it=1000, gamma=0.01,
+    ),
+}
+comparison = ModelComparison(candidates, folds, fold_seed=42,
+                             preprocessor_factory=factory)
+results = comparison.run(X_dev, y_dev)
+print(format_comparison_table(results))
+
+Each fold fits imputation, scaling, and one-hot categories on its training
+rows only, then applies the same fitted parameters and feature order to its
+validation rows. The same factory is reused by `ThresholdTuner` (via the
+`ModelEvaluator` configuration it receives) and by `HoldoutEvaluator`, so the
+final holdout evaluation refits preprocessing on all development rows and
+applies that fitted state to the reserved local test set.
+
+### Reproducible inference
+
+Fitted parameters (medians, means, standard deviations, category lists) live
+in the transformer instances. For `run.py`, rebuild the same pipeline with the
+same `num_mask` / `cat_mask`, fit it on the labeled training rows, then
+transform the competition test features before prediction. Record the column
+masks and any non-default settings (e.g. `ConstantImp(fill_val=...)`,
+`OHE(drop_first=...)`) in the experiment metadata and the written report.
+
+### Notes and limits
+
+- `OHE` treats every column it receives as categorical; numeric columns must
+  go through `preproc_MSCOHE`'s numeric branch, otherwise the encoding will
+  explode in width.
+- Unknown categories at transform time produce all-zero indicator rows; they
+  are not mapped to the dropped reference category.
+- `StandardScaler` uses population standard deviation (`ddof=0`); this matches
+  the fold-summary convention used elsewhere in the pipeline.
+- `ColumnTransformer` expects **boolean column masks** (not index lists), as
+  produced by exploration when selecting numeric vs. categorical columns. The
+  mask is used both for selection (`X[:, cols]`) and for feature naming
+  (`np.flatnonzero(cols)` in `get_feat_name`). Pass masks consistently to
+  `preproc_MSCOHE(num_mask, cat_mask)`; index lists are not supported by
+  `get_feat_name`.
+- `ColumnTransformer.get_feat_name()` assumes the `OHE` step is the last step
+  of its pipeline when generating categorical feature names; keep that order
+  when adding new pipelines.
 
 ## Model evaluation protocol
 
@@ -261,15 +349,25 @@ baseline_metrics = evaluate(y_val, y_pred, y_score)
 
 For learned preprocessing, pass a fresh instance as `preprocessor` to each `evaluate_fold` call. It must provide `fit(X_train, y_train)` and `transform(X)`: fitting receives only training features and their original `{-1, +1}` labels, then transformation runs on training and validation separately. Transformations must preserve row counts/order and produce the same feature columns for both portions, without an intercept column. The evaluator copies input arrays before preprocessing so operations in place preserve the caller's raw data.
 
-The production preprocessing module is still a placeholder. Use `preprocessor=None` only when no learned preprocessing is needed, as in this finite synthetic example:
+Pass `preprocessor_factory=preproc_MSCOHE(num_inputs=..., cat_inputs=...)` (or another factory returning a fresh preprocessor) when learned preprocessing is needed. See *Preprocessing* above for the fit/transform contract. 
+Use `preprocessor=None` only when no learned preprocessing is needed, as in this finite synthetic example:
 
 ```python
+from src.data_prep.preprocessing import preproc_MSCOHE
 from src.evaluation.evaluator import ModelEvaluator
+from src.evaluation.cross_validation import stratified_k_fold
 
-evaluator = ModelEvaluator(method="ridge_regression", lmbd=0.1)
+folds = stratified_k_fold(y_dev, k=5, seed=42)
+factory = lambda: preproc_MSCOHE(num_mask=NUM_MASK, cat_mask=CAT_MASK)
+
+evaluator = ModelEvaluator(
+    method="ridge_regression",
+    lmbd=0.1,
+    preprocessor_factory=factory,
+)
 fold_result = evaluator.evaluate_fold(
-    X_train=[[0.0], [1.0]], y_train=[-1, 1],
-    X_val=[[0.25], [0.75]], y_val=[-1, 1],
+    X_train=X_dev[train_rows], y_train=y_dev[train_rows],
+    X_val=X_dev[val_rows],   y_val=y_dev[val_rows],
 )
 print(fold_result["metrics"])
 ```
