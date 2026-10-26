@@ -7,7 +7,7 @@
 
 import numpy as np 
 
-# imputers (for now only median)
+# imputers (for now only median and constant)
 
 class MedianImp :
     """Replace Nan by the median of the column"""
@@ -21,13 +21,29 @@ class MedianImp :
         return self 
 
     def transform(self, X):
-        X = X.copy()
+        X = np.array(X, dtype=np.float64, copy=True)
         idx = np.where(np.isnan(X))
         X[idx] = self.med[idx[1]]      # idx[1] columns of nan points 
         return X
 
     def fit_transform(self, X) : 
-        return self.fit(X).tranform(X)
+        return self.fit(X).transform(X)
+
+
+class ConstantImp :
+    def __init__(self, fill_val : float = -1.0):
+        self.fill_val = fill_val
+
+    def fit(self, X):
+        return self
+
+    def transform(self, X):
+        X = np.array(X, dtype=np.float64, copy=True)
+        X[np.isnan(X)] = self.fill_val
+        return X
+
+    def fit_transform(self, X):
+        return self.transform(X)
 
 
 # Scaler 
@@ -45,7 +61,7 @@ class StandardScaler :
         return self 
 
     def transform(self, X):
-        X = X.copy()
+        X = np.array(X, dtype=np.float64, copy=True)
         return (X - self.mean) / self.std
 
     def fit_transform(self, X):
@@ -59,17 +75,13 @@ class OHE :
     Ignore unknown categories
     Take categories as input """
 
-    def __init__(self, drop_first: bool = True, cat_inputs=None):
-        if self.cat_inputs is None :
-            raise ValueError("OHE: cat inputs is mandatory")
+    def __init__(self, drop_first: bool = True):
         self.drop_first = drop_first
-        self.cat_inputs = cat_inputs      #list of name of variables 
         self.categories = None      #list of list of the values a var can take 
 
     def fit(self, X):
-        cols = np.flatnonzero(self.cat_inputs)      #change once know the input format
         cats = []
-        for j in cols :
+        for j in range(X.shape[1]) :
             uniq = np.unique(X[:, j])
             if self.drop_first and uniq.size > 1:
                 uniq = uniq[1:]
@@ -78,14 +90,14 @@ class OHE :
         return self
 
     def transform(self, X):
-        if self.categories_ is None:
-            raise RuntimeError("call fit first")
-        cols = np.flatnonzero(self.cat_inputs)
+        if self.categories is None:
+            raise RuntimeError("OHE : call fit first")
+
         blc = [] 
-        for j, cats in zip(cols, self.categories):
+        for j, cats in enumerate(self.categories):
             val = X[:, j]
             blc.append((val[:, None] == cats[None, :]))
-        return np.hstack(blc)
+        return np.hstack(blc).astype(np.float64)
 
     def fit_transform(self, X):
         return self.fit(X).transform(X)
@@ -104,14 +116,88 @@ class ColumnTransformer :
     """
     def __init__(self, transformers):
         self.transformers = transformers
-        self._fitted = None 
+        self.fitted = None 
 
     def fit(self, X):
-        fitted = []
-        used = set()
+        self.fitted = []
         for name, t, cols in self.transformers:
-            used.update(cols)
             t.fit(X[:, cols])
+            n_out = t.transform(X[:, cols]).shape[1]
+            self.fitted.append((name, t, cols, n_out))
+        return self 
+
+    def transform(self, X):
+        blc = [t.transform(X[:, cols]) for _, t, cols, _ in self.fitted]
+        return np.hstack(blc)
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+    def get_feat_name(self):
+        prefix = "X"
+        names = []
+        for _, t, cols, _ in self.fitted:
+            cols = np.flatnonzero(cols)
+            if isinstance(t, Pipeline) and isinstance(t.steps[-1][1], OHE):      #t.steps list of tuples (name, tranformer)
+                                                                                #suppose ohe is always last in pipeline
+                ohe: OHE = t.steps[-1][1]
+                for j, cats in zip(cols, ohe.categories):
+                    for c in cats:
+                        names.append(f"{prefix}{j}_cat{c:g}")
+            else:
+                for j in cols:
+                    names.append(f"{prefix}{j}")
+        return names 
+
+
+    #pipeline 
+
+class Pipeline : 
+    def __init__(self, steps):
+        self.steps = steps
+
+    def fit(self, X):
+        # just like sklearn, fit_transform every step except the last 
+        for _, t in self.steps[:-1]:
+            X = t.fit_transform(X) 
+        self.steps[-1][1].fit(X)
+        return self
+
+    def transform(self, X):
+        for _, t in self.steps:      
+            X = t.transform(X)
+        return X
+
+    def fit_transform(self, X):
+        for _, t in self.steps[:-1]:
+            X = t.fit_transform(X)
+        return self.steps[-1][1].fit_transform(X)
+
+
+###############################################################################
+
+
+def preproc_MSCOHE(num_inputs, cat_inputs): 
+    """Build a pipeline equivalent to the one in sklearn 
+    with MSCOHE : Median/scale for num inputs and Constant/OHE for categorical"""
+
+    return ColumnTransformer([
+        ("num", Pipeline([
+            ("imp", MedianImp()),
+            ("scl", StandardScaler()),
+        ]), num_inputs),
+        ("cat", Pipeline([
+            ("imp", ConstantImp(fill_value=-1.0)),
+            ("ohe", OHE(drop_first=True)),
+        ]), cat_inputs),
+    ])
+
+
+
+
+
+        
+
 
 
 
