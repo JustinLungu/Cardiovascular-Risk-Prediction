@@ -24,3 +24,5 @@ __pycache__/
 # Local planning notes
 roadmap_notes/
 /roadmap.md
+notebooks/exp.ipynb
+notebooks/exploration_review_of_review.ipynb
