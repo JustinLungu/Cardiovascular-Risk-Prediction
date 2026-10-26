@@ -110,9 +110,9 @@ class ColumnTransformer :
     """Apply transformer to different groups of columns then concat the result
     Columns not treated by a transformer is dropped 
     
-    transformers : list[tuple[str, object, list[int]]]
-        ex: [("num", MedianImputer+StandardScaler, [0,1,5]),
-             ("cat", ConstantImputer+OneHotEncoder, [2,3,4])]
+    transformers : list[tuple[str, object, np.ndarray[bool]]]
+        ex: [("num", MedianImputer+StandardScaler, num_mask),
+             ("cat", ConstantImputer+OneHotEncoder, cat_mask)]
     """
     def __init__(self, transformers):
         self.transformers = transformers
@@ -187,7 +187,7 @@ def preproc_MSCOHE(num_inputs, cat_inputs):
             ("scl", StandardScaler()),
         ]), num_inputs),
         ("cat", Pipeline([
-            ("imp", ConstantImp(fill_value=-1.0)),
+            ("imp", ConstantImp(fill_val=-1.0)),
             ("ohe", OHE(drop_first=True)),
         ]), cat_inputs),
     ])
