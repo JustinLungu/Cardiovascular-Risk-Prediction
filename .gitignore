@@ -11,6 +11,13 @@ data/*
 .venv/
 __pycache__/
 .pytest_cache/
+.ipynb_checkpoints/
+
+# Local verification tests
+/tests/
+
+# Generated model comparison reports
+/results/
 
 .vscode/
 .idea/
@@ -18,3 +25,6 @@ __pycache__/
 
 # Local planning notes
 roadmap_notes/
+/roadmap.md
+notebooks/exp.ipynb
+notebooks/exploration_review_of_review.ipynb
