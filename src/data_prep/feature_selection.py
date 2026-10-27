@@ -149,7 +149,7 @@ def feature_selection(x, labels):
             f"x has {x.shape[1]} columns but labels has {len(labels)} names"
         )
 
-    keep = [i for i, name in enumerate(labels) if name not in COLS_TO_REMOVE]
+    keep = [i for i, name in enumerate(labels) if name not in cols_to_remove]
     x = x[:, keep]
     labels = [labels[i] for i in keep]
     col_idx = {name: i for i, name in enumerate(labels)}

@@ -169,11 +169,11 @@ print(format_comparison_table(results))
 ```
 
 Each fold fits imputation, scaling, and one-hot categories on its training
-rows only, then applies the same fitted parameters and feature order to its
-validation rows. The same factory is reused by `ThresholdTuner` (via the
-`ModelEvaluator` configuration it receives) and by `HoldoutEvaluator`, so the
-final holdout evaluation refits preprocessing on all development rows and
-applies that fitted state to the reserved local test set.
+features only, then applies the same fitted parameters and feature order to its
+validation rows. `ThresholdTuner` reuses the resulting out-of-fold scores and
+does not fit preprocessing again. Pass the same factory to `HoldoutEvaluator`
+so the final holdout evaluation refits preprocessing on all development rows
+and applies that fitted state to the reserved local test set.
 
 ### Reproducible inference
 
@@ -349,10 +349,12 @@ baseline_metrics = evaluate(y_val, y_pred, y_score)
 
 `ModelEvaluator` in `src/evaluation/evaluator.py` keeps the model method, threshold, and training parameters together. Configure it once, then call `evaluator.evaluate_fold(X_train, y_train, X_val, y_val, ...)` on the development rows selected by `stratified_k_fold`. The evaluator combines preprocessing, training, prediction, and metrics. Settings such as `lmbd`, `max_it`, `gamma`, and `seed` are forwarded to `train_model` on each call.
 
-For learned preprocessing, pass a fresh instance as `preprocessor` to each `evaluate_fold` call. It must provide `fit(X_train, y_train)` and `transform(X)`: fitting receives only training features and their original `{-1, +1}` labels, then transformation runs on training and validation separately. Transformations must preserve row counts/order and produce the same feature columns for both portions, without an intercept column. The evaluator copies input arrays before preprocessing so operations in place preserve the caller's raw data.
+For learned preprocessing, pass a fresh instance as `preprocessor` to each `evaluate_fold` call. It must provide `fit(X_train)` and `transform(X)`: fitting learns only from training features, then transformation runs on training and validation separately. Labels are passed to model training and evaluation, not to these feature-only preprocessors. Transformations must preserve row counts/order and produce the same feature columns for both portions, without an intercept column. The evaluator copies input arrays before preprocessing so operations in place preserve the caller's raw data.
 
-Pass `preprocessor_factory=preproc_MSCOHE(num_inputs=..., cat_inputs=...)` (or another factory returning a fresh preprocessor) when learned preprocessing is needed. See *Preprocessing* above for the fit/transform contract. 
-Use `preprocessor=None` only when no learned preprocessing is needed, as in this finite synthetic example:
+For one fold, construct the preprocessor directly using the selected numeric
+and categorical boolean masks. The cross-validation runners accept a factory
+and construct these instances for you. Use `preprocessor=None` only when no
+learned preprocessing is needed.
 
 ```python
 from src.data_prep.preprocessing import preproc_MSCOHE
@@ -360,16 +362,14 @@ from src.evaluation.evaluator import ModelEvaluator
 from src.evaluation.cross_validation import stratified_k_fold
 
 folds = stratified_k_fold(y_dev, k=5, seed=42)
-factory = lambda: preproc_MSCOHE(num_mask=NUM_MASK, cat_mask=CAT_MASK)
+train_rows, val_rows = folds[0]
+preprocessor = preproc_MSCOHE(num_inputs=NUM_MASK, cat_inputs=CAT_MASK)
 
-evaluator = ModelEvaluator(
-    method="ridge_regression",
-    lmbd=0.1,
-    preprocessor_factory=factory,
-)
+evaluator = ModelEvaluator(method="ridge_regression", lmbd=0.1)
 fold_result = evaluator.evaluate_fold(
     X_train=X_dev[train_rows], y_train=y_dev[train_rows],
     X_val=X_dev[val_rows],   y_val=y_dev[val_rows],
+    preprocessor=preprocessor,
 )
 print(fold_result["metrics"])
 ```
@@ -394,7 +394,7 @@ oof_predictions = cv_result["oof_y_pred"]
 oof_scores = cv_result["oof_y_score"]
 ```
 
-For learned preprocessing, pass `preprocessor_factory` to `CrossValidator`: a callable that constructs a new preprocessor for each fold, such as your preprocessing class or a `lambda` supplying its settings. Each instance follows the `fit(X_train, y_train)` / `transform(X)` interface above. Pass a constructor rather than an already-created instance; fitting stays inside each fold. The production preprocessing implementation is still pending.
+For learned preprocessing, pass `preprocessor_factory` to `CrossValidator`: a callable that constructs a new preprocessor for each fold, such as your preprocessing class or a `lambda` supplying its settings. Each instance follows the `fit(X_train)` / `transform(X)` interface above. Pass a constructor rather than an already-created instance; fitting stays inside each fold. The available `preproc_MSCOHE` factory is shown in the preprocessing section.
 
 `fold_results` contains the one-fold result dictionaries in the same order as `folds`. The out-of-fold (OOF) arrays follow the original development row order, so they align with `y_dev` and development IDs. Each row receives a prediction from a model trained on the other folds. The runner checks that each fold separates training and validation rows and that every development row validates exactly once, before fitting any models. Pass only development data; the reserved local test set stays separate.
 
@@ -432,7 +432,7 @@ ridge_summary = results["Ridge"]["summary"]
 ridge_oof_scores = results["Ridge"]["oof_y_score"]
 ```
 
-For learned preprocessing, pass `preprocessor_factory` to `ModelComparison` using the interface above. Every model uses that factory, with a fresh instance per fold and fitting on training rows only. The real preprocessing implementation is still pending. Keep the reserved local test set outside this workflow.
+For learned preprocessing, pass `preprocessor_factory` to `ModelComparison` using the interface above. Every model uses that factory, with a fresh instance per fold and `fit(X_train)` on training features only. Keep the reserved local test set outside this workflow.
 
 The table shows F1, precision, recall, accuracy, and ROC-AUC as `mean ± std` to four decimal places. Ranking uses full-precision mean F1; ties keep the original candidate order. Complete summaries, fold results, and OOF arrays remain accessible by candidate name. The example settings demonstrate the API; select the actual model settings using development validation results.
 

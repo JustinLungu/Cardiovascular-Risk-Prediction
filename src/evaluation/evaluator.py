@@ -50,7 +50,7 @@ class ModelEvaluator:
     def evaluate_fold(self, X_train, y_train, X_val, y_val, preprocessor=None):
         """Fit and evaluate one training/validation pair, preserving input arrays.
 
-        Pass a fresh preprocessor with fit(X, y) and transform(X), or None when
+        Pass a fresh preprocessor with fit(X) and transform(X), or None when
         no learned preprocessing is needed. Transforms must preserve row
         order/count and use the same feature columns for both portions.
         Validation labels must contain both classes for ROC-AUC. Return metrics,
@@ -83,8 +83,8 @@ class ModelEvaluator:
             training_loss = None
         else:
             if preprocessor is not None:
-                # Learn from training rows/labels only, then reuse that fitted state.
-                preprocessor.fit(X_train, y_train)
+                # Learn from training features only, then reuse that fitted state.
+                preprocessor.fit(X_train)
                 X_train = preprocessor.transform(X_train)
                 X_val = preprocessor.transform(X_val)
             # Measure fitting separately from learned preprocessing and scoring.
