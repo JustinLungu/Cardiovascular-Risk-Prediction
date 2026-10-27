@@ -101,7 +101,7 @@ def roc_auc_score(y_true, y_score):
     # Start the ROC curve at (0, 0), where no rows are predicted positive.
     true_positive_rate = np.append(0.0, true_positives / n_positive)
     false_positive_rate = np.append(0.0, false_positives / n_negative)
-    return float(np.trapz(true_positive_rate, false_positive_rate))
+    return float(np.trapezoid(true_positive_rate, false_positive_rate))
 
 
 def evaluate(y_true, y_pred, y_score):

@@ -169,10 +169,12 @@ def feature_selection(x, labels):
     ordinal_mask = np.isin(labels_array, ORDINAL_COLS)
     nominal_mask = np.isin(labels_array, NOMINAL_COLS)
 
-    masks = {
+    """ masks = {
         "numerical": numerical_mask,
         "ordinal": ordinal_mask,
         "nominal": nominal_mask,
-    }
+    } """
 
-    return x, labels, masks
+    categorical_mask = ordinal_mask | nominal_mask
+
+    return x, labels, numerical_mask, categorical_mask

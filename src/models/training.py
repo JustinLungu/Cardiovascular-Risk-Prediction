@@ -9,7 +9,7 @@ from src.models.model_inputs import add_intercept, prepare_training_labels
 
 
 def train_model(
-    X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=0.1
+    X, y, method="least_squares", max_it=1000, gamma=0.01, seed=42, lmbd=1e-6
 ):
     """Train a model using the course implementations and return (w, loss).
 

@@ -14,7 +14,7 @@ class MedianImp :
     def __init__(self):
         self.med = None 
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         self.med = np.nanmedian(X, axis = 0) #vector med per column 
         # column full nan forgotten by data expl 
         self.med = np.where(np.isnan(self.med), 0.0, self.med) 
@@ -26,15 +26,15 @@ class MedianImp :
         X[idx] = self.med[idx[1]]      # idx[1] columns of nan points 
         return X
 
-    def fit_transform(self, X) : 
-        return self.fit(X).transform(X)
+    def fit_transform(self, X, y=None): 
+        return self.fit(X, y).transform(X)
 
 
 class ConstantImp :
     def __init__(self, fill_val : float = -1.0):
         self.fill_val = fill_val
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         return self
 
     def transform(self, X):
@@ -42,7 +42,7 @@ class ConstantImp :
         X[np.isnan(X)] = self.fill_val
         return X
 
-    def fit_transform(self, X):
+    def fit_transform(self, X, y=None):
         return self.transform(X)
 
 
@@ -54,7 +54,7 @@ class StandardScaler :
         self.mean = None
         self.std = None 
 
-    def fit(self, X): 
+    def fit(self, X, y=None): 
         self.mean = X.mean(axis = 0)      #mean per column
         self.std = X.std(axis = 0)
         self.std[self.std == 0] = 1.0      #avoid 0-div
@@ -64,8 +64,8 @@ class StandardScaler :
         X = np.array(X, dtype=np.float64, copy=True)
         return (X - self.mean) / self.std
 
-    def fit_transform(self, X):
-        return self.fit(X).transform(X)
+    def fit_transform(self, X, y=None):
+        return self.fit(X,y).transform(X)
 
 
 #OHE
@@ -79,7 +79,7 @@ class OHE :
         self.drop_first = drop_first
         self.categories = None      #list of list of the values a var can take 
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         cats = []
         for j in range(X.shape[1]) :
             uniq = np.unique(X[:, j])
@@ -99,8 +99,8 @@ class OHE :
             blc.append((val[:, None] == cats[None, :]))
         return np.hstack(blc).astype(np.float64)
 
-    def fit_transform(self, X):
-        return self.fit(X).transform(X)
+    def fit_transform(self, X, y=None):
+        return self.fit(X,y).transform(X)
 
 
 
@@ -116,22 +116,22 @@ class ColumnTransformer :
     """
     def __init__(self, transformers):
         self.transformers = transformers
-        self.fitted = None 
+        self.fitted = None
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         self.fitted = []
         for name, t, cols in self.transformers:
-            t.fit(X[:, cols])
+            t.fit(X[:, cols], y)
             n_out = t.transform(X[:, cols]).shape[1]
             self.fitted.append((name, t, cols, n_out))
-        return self 
+        return self
 
     def transform(self, X):
         blc = [t.transform(X[:, cols]) for _, t, cols, _ in self.fitted]
         return np.hstack(blc)
 
-    def fit_transform(self, X):
-        return self.fit(X).transform(X)
+    def fit_transform(self, X, y=None):
+        return self.fit(X, y).transform(X)
 
     def get_feat_name(self):
         prefix = "X"
@@ -152,26 +152,25 @@ class ColumnTransformer :
 
     #pipeline 
 
-class Pipeline : 
+class Pipeline:
     def __init__(self, steps):
         self.steps = steps
 
-    def fit(self, X):
-        # just like sklearn, fit_transform every step except the last 
+    def fit(self, X, y=None):
         for _, t in self.steps[:-1]:
-            X = t.fit_transform(X) 
-        self.steps[-1][1].fit(X)
+            X = t.fit_transform(X, y)
+        self.steps[-1][1].fit(X, y)
         return self
 
     def transform(self, X):
-        for _, t in self.steps:      
+        for _, t in self.steps:
             X = t.transform(X)
         return X
 
-    def fit_transform(self, X):
+    def fit_transform(self, X, y=None):
         for _, t in self.steps[:-1]:
-            X = t.fit_transform(X)
-        return self.steps[-1][1].fit_transform(X)
+            X = t.fit_transform(X, y)
+        return self.steps[-1][1].fit_transform(X, y)
 
 
 ###############################################################################
