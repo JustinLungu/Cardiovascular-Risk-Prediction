@@ -39,7 +39,7 @@ From the repo root:
 uv sync
 ```
 
-This creates a `.venv/` using Python 3.9, NumPy 1.23.1, and Matplotlib 3.5.2, matching the course grading environment. `uv.lock` pins the resolved dependencies. Development tools (pytest 7.1.2, GitPython 3.1.18, and Black 22.6.0) are included by default for the supplied tests; they are not libraries for the ML implementation. Use `uv sync --no-dev` for just the project dependencies.
+This creates a `.venv/` using Python 3.12.12, within the same Python 3.12 series as the model-selection notebook. The project requires NumPy 2.x for [`np.trapezoid`](https://numpy.org/doc/stable/reference/generated/numpy.trapezoid.html), with compatible Matplotlib and pytest versions. `.python-version` fixes the tested Python patch release, and `uv.lock` pins the exact resolved package versions so teammates can reproduce the same environment. Development tools (pytest, GitPython, and Black) are included by default for the supplied tests; they are not libraries for the ML implementation. Use `uv sync --no-dev` for just the project dependencies. After syncing, select this project's `.venv` kernel in your editor and restart any already-running notebook kernel.
 
 ### 3. Run code
 
