@@ -62,6 +62,44 @@ To download and prepare the dataset, run:
 bash scripts/prepare_data.sh
 ```
 
+## Generate competition predictions
+
+After preparing the original CSV files in `data/`, run:
+
+```bash
+uv run python run.py
+```
+
+This trains the selected model on all labeled rows from `data/x_train.csv` and
+`data/y_train.csv`, predicts the separate competition benchmark `data/x_test.csv`,
+and writes `submission.csv` at the repository root. The output uses the course
+helper's `Id,Prediction` format, preserves benchmark ID order, and contains
+labels `-1` or `1`. An existing output file is replaced. CSV files are gitignored.
+
+The script applies the same fixed selection and survey-code cleaning to both
+datasets, retaining 53 raw features for the supplied dataset. It fits numeric
+median imputation and standard scaling, plus categorical constant imputation and
+one-hot encoding, on labeled training rows only. The fitted preprocessor then
+transforms the benchmark without refitting.
+
+The frozen model is regularized logistic regression with lambda `1e-6`, 3,000
+updates, learning rate `0.05`, seed `42`, and classification cutoff `0.2`.
+The existing training helper starts from zero weights and converts labels to
+`0/1`; predictions are converted back to `-1/+1`. Settings are recorded directly
+in `run.py`, so execution does not require a notebook or local results files.
+This final fit reuses all labeled rows after model selection; it does not rerun
+splitting, cross-validation, threshold tuning, or holdout evaluation.
+
+For different input or output locations:
+
+```bash
+uv run python run.py --data-dir /path/to/data --output results/submission.csv
+```
+
+The input directory must contain `x_train.csv`, `y_train.csv`, and `x_test.csv`.
+Training and benchmark feature names must match in the same order. Generating
+the CSV does not upload it to the competition platform.
+
 ## Code structure
 
 `implementations.py` and `run.py` stay at the repository root because the course grading tests expect them there. The former contains the six required ML methods; the latter is a thin entry point for reproducing predictions. Reusable code is grouped by responsibility under `src/`:
@@ -205,7 +243,7 @@ masks and any non-default settings (e.g. `ConstantImp(fill_val=...)`,
 
 ## Model evaluation protocol
 
-The NumPy model comparison workflow is being implemented on `feat/model-comparison`. The following protocol defines how we will compare candidates and select the final configuration.
+The NumPy model comparison workflow follows the protocol below to compare candidates and select the final configuration. The frozen configuration used for competition predictions is recorded in `run.py`.
 
 ### Development data and final test set
 
@@ -586,11 +624,12 @@ confusion counts/matrix, fitting diagnostics, row counts, exact row IDs, and
 metadata. A different output path can be passed to `save_report`.
 
 Use the reserved test set once after selection; do not tune settings or cutoffs
-using its results. Real-data preprocessing and development-model selection
-remain pending; the saved synthetic demonstrations do not select a cardiovascular
-model. Once a real evaluation is recorded, its JSON `configuration` and the
-preprocessing settings in `metadata` provide the handoff for later refitting.
+using its results. Saved synthetic demonstrations verify the workflow rather
+than select a cardiovascular model. A real evaluation's JSON `configuration`
+and preprocessing `metadata` document the handoff for final refitting. The
+selected settings are copied into tracked `run.py`, so local report files are
+not required to reproduce the final pipeline.
 
 After recording the final local result, refit the selected pipeline on all labeled data before generating competition benchmark predictions through `run.py`.
 
-The final training and evaluation workflow uses NumPy and the Python standard library, with permitted visualization libraries for plots. This branch stops after the holdout-evaluation implementation for teammate integration. Notebook migration, obsolete wrapper removal, and the remaining documentation work (roadmap steps 25–27) are deferred to a separate refactor branch after team agreement.
+The final training and evaluation workflow uses NumPy and the Python standard library, with permitted visualization libraries for plots. `run.py` provides final refitting and competition CSV generation using the existing pipeline. Notebook migration, obsolete wrapper removal, and the remaining documentation work (roadmap steps 25–27) are deferred to a separate refactor branch after team agreement.
